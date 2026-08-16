@@ -2,32 +2,37 @@ package main
 
 import (
 	"context"
+	"errors"
 	"flag"
 	"fmt"
-	"net/url"
-	"os"
-	"strconv"
-
+	"mitre_red_team/internal/agent"
 	"mitre_red_team/internal/catalog"
 	"mitre_red_team/internal/config"
 	"mitre_red_team/internal/engine"
+	"mitre_red_team/internal/llm"
 	"mitre_red_team/internal/model"
 	"mitre_red_team/internal/technique"
 	"mitre_red_team/internal/technique/enumeration"
+	"mitre_red_team/internal/utilities"
+	"net/url"
+	"os"
+	"strconv"
+	"strings"
 )
 
 func main() {
 	techniqueID := flag.String("technique", "", "要执行的技术 ID，如 BB05.001")
 	tacticID := flag.String("tactic", "", "要执行的战术 ID，如 BB05")
 	mitreID := flag.String("mitre", "", "要执行的 MITRE ATT&CK 技术 ID，如 T1046")
-	url := flag.String("url", "", "目标 URL，必填")
+	targetURL := flag.String("url", "", "目标 URL，必填")
 	configPath := flag.String("config", "configs/redteam.json", "配置文件路径")
-	flag.Usage = printUsage
-	flag.Parse()
+	manualWordlist := flag.String("wordlist", "", "自定义字典文件路径（每行一个条目，UTF-8 编码）")
+	flag.StringVar(manualWordlist, "w", "", "自定义字典文件路径的短别名")
+	aiMode := flag.Bool("ai", false, "启用 AI 辅助：随机选择已配置的 LLM 供应商，分析 TTP 输出并自动执行建议的下一步技术（最多 3 轮）")
 
-	if err := validateFlags(*techniqueID, *tacticID, *mitreID, *url); err != nil {
+	// 加载 .env：文件不存在或条目未配置时静默忽略，只有已配置的项才进入进程环境。
+	if err := utilities.LoadDotenv(".env"); err != nil {
 		fmt.Fprintln(os.Stderr, "错误:", err)
-		printUsage()
 		os.Exit(1)
 	}
 
@@ -46,6 +51,16 @@ func main() {
 		os.Exit(1)
 	}
 
+	// 帮助菜单需要展示 catalog 中的全部 TTP，因此 usage 依赖已加载的目录数据。
+	flag.Usage = func() { printUsage(catalogData) }
+	flag.Parse()
+
+	if err := validateFlags(*techniqueID, *tacticID, *mitreID, *targetURL); err != nil {
+		fmt.Fprintln(os.Stderr, "错误:", err)
+		printUsage(catalogData)
+		os.Exit(1)
+	}
+
 	if missingTools := configuration.CheckToolsAvailable(); len(missingTools) > 0 {
 		fmt.Fprintln(os.Stderr, "错误: 缺少以下必需工具:")
 		for _, name := range missingTools {
@@ -59,9 +74,15 @@ func main() {
 		os.Exit(1)
 	}
 
-	registerTechniques(configuration)
+	wordlistPath, err := resolveWordlist(configuration, *manualWordlist)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, "错误:", err)
+		os.Exit(1)
+	}
 
-	target, err := parseTarget(*url)
+	registerTechniques(configuration, wordlistPath)
+
+	target, err := parseTarget(*targetURL)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, "错误:", err)
 		os.Exit(1)
@@ -69,9 +90,12 @@ func main() {
 
 	var results []model.ExecutionResult
 	executionEngine := engine.New(catalogData)
-	if *mitreID != "" {
+	switch {
+	case *aiMode:
+		results, err = runAI(context.Background(), executionEngine, catalogData, target, *mitreID, *techniqueID, *tacticID)
+	case *mitreID != "":
 		results, err = executionEngine.ExecuteByMitre(context.Background(), target, *mitreID)
-	} else {
+	default:
 		results, err = executionEngine.Execute(context.Background(), model.ExecutionRequest{
 			Target:      target,
 			TechniqueID: *techniqueID,
@@ -98,11 +122,58 @@ var toolInstallHints = map[string]string{
 	"sqlmap":    "brew install sqlmap",
 }
 
-// registerTechniques 注册已实现的技术到注册表。
-func registerTechniques(configuration *config.Config) {
-	const defaultWordlist = "common.txt"
+// fallbackWordlistPath 是配置缺省时内置的默认字典路径。
+const fallbackWordlistPath = "configs/wordlists/common.txt"
+
+// registerTechniques 注册已实现的技术到注册表，使用解析后的字典路径。
+func registerTechniques(configuration *config.Config, wordlist string) {
 	technique.Register("directory-enumeration",
-		enumeration.NewDirectoryEnumeration(configuration.Tools["ffuf"], defaultWordlist))
+		enumeration.NewDirectoryEnumeration(configuration.Tools["ffuf"], wordlist))
+}
+
+// resolveWordlist 决定本次执行使用的字典路径。
+// 优先使用 --wordlist/-w 指定的自定义字典；未指定时交互询问；
+// 仍未指定则使用配置的默认字典。自定义字典不可用时询问是否回退到默认。
+func resolveWordlist(configuration *config.Config, manualWordlist string) (string, error) {
+	defaultWordlist := configuration.Wordlists["common"]
+	if defaultWordlist == "" {
+		defaultWordlist = fallbackWordlistPath
+	}
+	wordlistPath, err := enumeration.ResolveWordlistPath(manualWordlist, defaultWordlist, os.Stdin, os.Stderr)
+	if err == nil {
+		return wordlistPath, nil
+	}
+	fmt.Fprintln(os.Stderr, "错误:", err)
+	if !enumeration.ConfirmDefaultFallback(os.Stdin, os.Stderr) {
+		return "", errors.New("已取消执行")
+	}
+	if err := enumeration.ValidateWordlist(defaultWordlist); err != nil {
+		return "", fmt.Errorf("默认字典同样不可用: %w", err)
+	}
+	return defaultWordlist, nil
+}
+
+// runAI 以 AI 辅助模式执行：从已配置的 LLM 供应商中随机选择一家，
+// 执行用户请求的初始技术，把执行输出交给 LLM 分析，并自动推进建议的下一步技术。
+func runAI(ctx context.Context, executionEngine *engine.Engine, catalogData *catalog.Catalog, target model.Target, mitreID string, techniqueID string, tacticID string) ([]model.ExecutionResult, error) {
+	initial := func(ctx context.Context) ([]model.ExecutionResult, error) {
+		if mitreID != "" {
+			return executionEngine.ExecuteByMitre(ctx, target, mitreID)
+		}
+		return executionEngine.Execute(ctx, model.ExecutionRequest{
+			Target:      target,
+			TechniqueID: techniqueID,
+			TacticID:    tacticID,
+		})
+	}
+	return agent.Run(ctx, agent.RunParams{
+		Engine:      executionEngine,
+		CatalogData: catalogData,
+		Target:      target,
+		Initial:     initial,
+		Providers:   llm.AvailableProviders(os.Getenv),
+		Logger:      utilities.Default,
+	})
 }
 
 // validateFlags 校验命令行参数：目标必填，技术/战术/MITRE 三者选一。
@@ -146,12 +217,45 @@ func parseTarget(rawURL string) (model.Target, error) {
 	return target, nil
 }
 
-// printUsage 打印命令用法与示例。
-func printUsage() {
+// printUsage 打印命令用法、字典说明、示例与 catalog 中的全部 TTP 列表。
+func printUsage(catalogData *catalog.Catalog) {
 	fmt.Fprintln(os.Stderr, "用法: mitre_red_team --url <目标> [--technique <技术ID> | --tactic <战术ID> | --mitre <MITRE ID>]")
+	fmt.Fprintln(os.Stderr)
+	fmt.Fprintln(os.Stderr, "字典说明:")
+	fmt.Fprintln(os.Stderr, "  默认字典：未指定任何自定义字典时，使用配置 configs/redteam.json 中")
+	fmt.Fprintln(os.Stderr, "    wordlists.common 指向的字典文件（缺省为 configs/wordlists/common.txt）。")
+	fmt.Fprintln(os.Stderr, "  自定义字典：通过 -w 或 --wordlist 指定字典文件路径。字典须为 UTF-8 编码，")
+	fmt.Fprintln(os.Stderr, "    每行一个条目；空行与 # 开头的注释行将被忽略。")
+	fmt.Fprintln(os.Stderr, "  交互式询问：未提供 --wordlist 时程序会提示输入字典路径，直接回车则使用默认字典。")
+	fmt.Fprintln(os.Stderr, "  校验规则：自定义字典必须存在、可读且包含至少一条有效条目；")
+	fmt.Fprintln(os.Stderr, "    校验失败时会提示原因，并可选择回退到默认字典继续执行。")
+	fmt.Fprintln(os.Stderr)
 	fmt.Fprintln(os.Stderr, "示例:")
 	fmt.Fprintln(os.Stderr, "  mitre_red_team --url https://example.com --technique BB05.001")
 	fmt.Fprintln(os.Stderr, "  mitre_red_team --url https://example.com --tactic BB05")
 	fmt.Fprintln(os.Stderr, "  mitre_red_team --url https://example.com --mitre T1046")
+	fmt.Fprintln(os.Stderr, "  mitre_red_team --url https://example.com --technique BB05.001 -w /path/to/custom.txt")
+	fmt.Fprintln(os.Stderr)
+	printAvailableTTPs(catalogData)
 	flag.PrintDefaults()
+}
+
+// printAvailableTTPs 以纯文本形式列出 catalog 中的全部战术与技术，
+// 每项附上目录中的简要描述，描述为空时只展示编号与名称。
+func printAvailableTTPs(catalogData *catalog.Catalog) {
+	fmt.Fprintln(os.Stderr, "可用战术与技术（来自 catalog/）:")
+	for _, tactic := range catalogData.Tactics {
+		tacticLine := fmt.Sprintf("  %s  %s", tactic.ID, tactic.Name)
+		if strings.TrimSpace(tactic.Description) != "" {
+			tacticLine += " — " + tactic.Description
+		}
+		fmt.Fprintln(os.Stderr, tacticLine)
+		for _, technique := range catalogData.TechniquesByTactic(tactic.ID) {
+			techniqueLine := fmt.Sprintf("    %s  %s", technique.ID, technique.Name)
+			if strings.TrimSpace(technique.Description) != "" {
+				techniqueLine += " — " + technique.Description
+			}
+			fmt.Fprintln(os.Stderr, techniqueLine)
+		}
+	}
 }

@@ -8,7 +8,8 @@ import (
 )
 
 // LoadDotenv 从 path 读取 KEY=VALUE 格式的环境变量文件并写入进程环境。
-// 已存在的环境变量不会被覆盖；空行与 # 开头的注释行被忽略；值两侧的引号会被剥离。
+// 已存在的环境变量不会被覆盖；空行与 # 开头的注释行被忽略；
+// 值两侧的引号会被剥离；值为空的条目视为未配置，跳过不写入环境。
 // 文件不存在时视为无配置，直接返回 nil。
 func LoadDotenv(path string) error {
 	file, err := os.Open(path)
@@ -33,6 +34,10 @@ func LoadDotenv(path string) error {
 		}
 		key = strings.TrimSpace(key)
 		value = strings.Trim(strings.TrimSpace(value), `"'`)
+		if value == "" {
+			// 未配置的条目不进入环境，避免空串覆盖或干扰已配置项判断。
+			continue
+		}
 		if _, exists := os.LookupEnv(key); !exists {
 			_ = os.Setenv(key, value)
 		}

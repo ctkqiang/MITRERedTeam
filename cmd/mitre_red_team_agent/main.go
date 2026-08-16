@@ -1,0 +1,4 @@
+package mitreredteamagent
+
+func main() {
+}

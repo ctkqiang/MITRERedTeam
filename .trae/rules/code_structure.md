@@ -174,8 +174,9 @@ if parsedTarget.Port == 0 {
 
 所有以 `_test.go` 结尾的 Go 测试文件必须放置在项目根目录的 `test/` 目录下，与被测包目录分离。
 
-- 命名模式：`<被测对象>_test.go`，如 `logger_test.go`、`catalog_loader_test.go`。
-- 测试文件使用外部测试包（`package <被测包>_test`），只能访问被测包的导出 API；未导出成员的验证通过公开 API 的输出间接断言。
+- 命名模式：`<被测对象>_test.go`，如 `logger_test.go`、`catalog_test.go`。
+- 测试文件统一使用外部测试包 `package tests`（因 `test/` 目录受 Go"单目录单包"约束），只能访问被测包的导出 API；未导出成员的验证通过公开 API 的输出间接断言。
+
 - `test/` 目录仅存放测试文件，不产生构建产物；构建门禁已排除该目录（见 `.githooks/pre-commit`）。
 - 新增测试文件必须同时满足本文件其余规范：中文注释、完整命名、gofmt 合规、无第三方依赖。
 

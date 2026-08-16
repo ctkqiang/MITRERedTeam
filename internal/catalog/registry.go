@@ -38,3 +38,18 @@ func (c *Catalog) TechniquesByTactic(tacticID string) []model.Technique {
 	}
 	return techniques
 }
+
+// TechniquesByMitreID 返回映射到指定 MITRE ATT&CK ID 的所有技术。
+// 一个 MITRE ID 可能对应多条技术，保持目录中声明的顺序；未匹配时返回空切片。
+func (c *Catalog) TechniquesByMitreID(mitreID string) []model.Technique {
+	var matches []model.Technique
+	for _, technique := range c.Techniques {
+		for _, mapped := range technique.MITRE {
+			if mapped == mitreID {
+				matches = append(matches, technique)
+				break
+			}
+		}
+	}
+	return matches
+}

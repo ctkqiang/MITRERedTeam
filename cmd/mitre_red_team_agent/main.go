@@ -1,4 +1,4 @@
-package mitreredteamagent
+package main
 
 func main() {
 }

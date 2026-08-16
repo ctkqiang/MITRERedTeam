@@ -1,0 +1,14 @@
+{
+  "tools": {
+    "ffuf": "/usr/local/bin/ffuf",
+    "nmap": "/usr/local/bin/nmap",
+    "nuclei": "/usr/local/bin/nuclei",
+    "httpx": "/usr/local/bin/httpx",
+    "subfinder": "/usr/local/bin/subfinder",
+    "sqlmap": "/usr/local/bin/sqlmap"
+  },
+  "notifications": {
+    "platform": "none",
+    "local": true
+  }
+}

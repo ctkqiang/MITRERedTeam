@@ -1,0 +1,33 @@
+#!/bin/sh
+#
+# commit-msg 钩子：强制提交信息使用中文，且包含主题行与逐项变更说明。
+# 仅校验提交信息，不影响作者信息等任何其他设置。
+
+COMMIT_MSG_FILE="$1"
+
+# 去掉注释行与空行，得到有效提交信息
+COMMIT_MESSAGE=$(grep -v '^#' "$COMMIT_MSG_FILE" | sed '/^$/d')
+
+# 1. 提交信息不能为空
+if [ -z "$COMMIT_MESSAGE" ]; then
+    echo "==> 提交信息不能为空，请填写中文提交说明"
+    echo "==> 参考模板: git commit --template .githooks/commit-template.txt"
+    exit 1
+fi
+
+# 2. 必须包含中文字符（CJK 统一表意文字范围）
+if ! echo "$COMMIT_MESSAGE" | grep -q '[一-鿿]'; then
+    echo "==> 提交信息必须使用中文，当前未检测到中文字符"
+    echo "==> 请按模板逐行说明改动: 主题行 + 每个文件/模块一行"
+    exit 1
+fi
+
+# 3. 结构：至少包含主题行与一个正文条目，每行对应具体代码变更
+LINE_COUNT=$(echo "$COMMIT_MESSAGE" | wc -l | tr -d ' ')
+if [ "$LINE_COUNT" -lt 2 ]; then
+    echo "==> 提交信息应包含主题行与逐项正文，每行对应具体代码变更"
+    echo "==> 示例: git commit -m '新增目录枚举' -m '- 文件: 改动内容'"
+    exit 1
+fi
+
+exit 0

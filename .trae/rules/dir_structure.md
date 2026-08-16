@@ -46,9 +46,9 @@ MITRERedTeam/
 │   └── techniques.json         # 技术目录数据：27 条技术，含 executor/mode/tools/mitre
 ├── cmd/
 │   ├── mitre_red_team/
-│   │   └── main.go             # CLI 主程序入口（当前为空壳，package 声明有误，见 §7）
+│   │   └── main.go             # CLI 主程序入口（package 已修正，CLI 功能待实现，见 §7）
 │   └── mitre_red_team_agent/
-│       └── main.go             # Agent 程序入口（当前为空壳，package 声明有误，见 §7）
+│       └── main.go             # Agent 程序入口（package 已修正，功能待实现，见 §7）
 ├── internal/
 │   ├── app/
 │   │   ├── app.go              # 应用装配层（当前为空壳）
@@ -58,8 +58,8 @@ MITRERedTeam/
 │       ├── techniques.go       # Technique 模型 + TechniqueMode(passive/active/manual)
 │       └── target.go           # Target 模型：ID/Host/Port/Scheme/Metadata
 ├── tools/
-│   ├── fuff/
-│   │   └── fuff.go             # 外部工具适配层骨架（目录名拼写有误，应为 ffuf，见 §7）
+│   ├── ffuf/
+│   │   └── ffuf.go             # 外部工具适配层骨架（未实现）
 │   ├── nmap/
 │   │   └── nmap.go             # 外部工具适配层骨架（未实现）
 │   └── nuclei/
@@ -106,7 +106,7 @@ Engine（internal/engine/）        编排：目标校验 → 目录查询 → �
 | `cmd/mitre_red_team_agent/main.go` | 空壳、有缺陷 | Modify | 修正 package 声明，按 agent 定位实现 |
 | `internal/app/{app,bootstrap}.go` | 空壳 | Modify | 作为装配入口承接 engine 初始化 |
 | `tools/{nmap,nuclei}/*.go` | 空壳 | Modify | 实现工具适配层 |
-| `tools/fuff/` | 空壳、拼写有误 | Modify | 重命名为 `ffuf` 后实现 |
+| `tools/ffuf/` | 空壳 | Modify | 实现工具适配层 |
 | `README.md` | 空 | Modify | 补充项目说明 |
 | `internal/model/{execution,result}.go` | 缺失 | New | 执行计划与结果模型 |
 | `internal/catalog/` | 缺失 | New | loader / registry / validator |
@@ -233,12 +233,8 @@ catalog（BB05.001）
 
 | 问题 | 位置 | 影响 | 处理建议 |
 |---|---|---|---|
-| `package` 声明非 `main` | 两个 `cmd/**/main.go` | `go build` 无法通过 | 修正为 `package main`，并接入 CLI 入口 |
-| 目录拼写错误 | `tools/fuff/` | 与工具 `ffuf` 不对应 | 重命名为 `tools/ffuf/` |
 | 空壳文件 | `internal/app/`、`tools/*/` | 无实际功能 | 按 §3 分层实现 |
 | 无 CLI 实现 | `cmd/mitre_red_team/` | 无法执行任何命令 | 实现 `--tactic` / `--technique` / `--target` 解析 |
-| 无测试 | `tests/` 缺失 | 无回归保障 | 补充单元与集成测试 |
-| 无配置 | `configs/` 缺失 | 工具路径不可配置 | 补充 `configs/redteam.json` |
 | `README.md` 为空 | 根目录 | 项目无说明 | 补充安装、用法、架构说明 |
 
 ## 8. 变更纪律

@@ -2,12 +2,12 @@ package catalog
 
 import (
 	"fmt"
-
 	"mitre_red_team/internal/model"
 )
 
 // Validate 校验目录数据的一致性，返回首个错误。
-// 覆盖：战术 ID 唯一、技术 ID 唯一、执行模式合法、技术所属战术存在、战术引用技术存在。
+// 覆盖：战术 ID 唯一、技术 ID 唯一、执行模式合法、技术所属战术存在。
+// 战术声明的技术引用允许尚未实现（规划与实现分离，查询时只返回已实现项）。
 func Validate(catalogData *Catalog) error {
 	if err := validateTacticIDs(catalogData.Tactics); err != nil {
 		return err
@@ -16,9 +16,6 @@ func Validate(catalogData *Catalog) error {
 		return err
 	}
 	if err := validateTechniqueModes(catalogData.Techniques); err != nil {
-		return err
-	}
-	if err := validateTacticReferences(catalogData); err != nil {
 		return err
 	}
 	return validateTechniqueReferences(catalogData)
@@ -39,12 +36,14 @@ func validateTacticIDs(tactics []model.Tactic) error {
 // validateTechniqueIDs 检查技术 ID 是否重复。
 func validateTechniqueIDs(techniques []model.Technique) error {
 	seen := make(map[string]struct{}, len(techniques))
+
 	for _, technique := range techniques {
 		if _, exists := seen[technique.ID]; exists {
 			return fmt.Errorf("技术 ID 重复: %s", technique.ID)
 		}
 		seen[technique.ID] = struct{}{}
 	}
+
 	return nil
 }
 
@@ -55,22 +54,6 @@ func validateTechniqueModes(techniques []model.Technique) error {
 		case model.TechniquePassive, model.TechniqueActive, model.TechniqueManual:
 		default:
 			return fmt.Errorf("非法的执行模式: %s（技术 %s）", technique.Mode, technique.ID)
-		}
-	}
-	return nil
-}
-
-// validateTacticReferences 检查战术引用的技术是否都存在。
-func validateTacticReferences(catalogData *Catalog) error {
-	techniqueIDs := make(map[string]struct{}, len(catalogData.Techniques))
-	for _, technique := range catalogData.Techniques {
-		techniqueIDs[technique.ID] = struct{}{}
-	}
-	for _, tactic := range catalogData.Tactics {
-		for _, techniqueID := range tactic.Techniques {
-			if _, exists := techniqueIDs[techniqueID]; !exists {
-				return fmt.Errorf("战术 %s 引用了不存在的技术 %s", tactic.ID, techniqueID)
-			}
 		}
 	}
 	return nil

@@ -6,9 +6,11 @@ import (
 )
 
 // Config 描述应用运行配置。
-// Tools 保存外部工具名到可执行文件路径的映射；Notifications 描述通知偏好。
+// Tools 保存外部工具名到可执行文件路径的映射；Wordlists 保存字典名到文件路径的映射；
+// Notifications 描述通知偏好。
 type Config struct {
 	Tools         map[string]string  `json:"tools"`
+	Wordlists     map[string]string  `json:"wordlists"`
 	Notifications NotificationConfig `json:"notifications"`
 }
 

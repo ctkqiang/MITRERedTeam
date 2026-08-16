@@ -212,7 +212,7 @@ catalog（BB05.001）
 
 ### configs/redteam.json
 
-运行配置，工具必须在 `tools` 段声明。值为**命令名**时经 PATH 解析（推荐，跨机器可用）；值为绝对路径时直接使用该二进制。禁止在代码中硬编码工具位置。
+运行配置，工具必须在 `tools` 段声明。值为**命令名**时经 PATH 解析（推荐，跨机器可用）；值为绝对路径时直接使用该二进制。字典在 `wordlists` 段声明，技术按名称引用，禁止在代码中硬编码字典路径。禁止在代码中硬编码工具位置。
 
 ```json
 {
@@ -223,6 +223,9 @@ catalog（BB05.001）
     "httpx": "httpx",
     "subfinder": "subfinder",
     "sqlmap": "sqlmap"
+  },
+  "wordlists": {
+    "common": "configs/wordlists/common.txt"
   }
 }
 ```

@@ -2,9 +2,8 @@ package ffuf
 
 import (
 	"context"
-	"time"
-
 	"mitre_red_team/tools"
+	"time"
 )
 
 // Fuzzer 封装 ffuf 目录与参数枚举。

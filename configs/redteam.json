@@ -7,6 +7,9 @@
     "subfinder": "subfinder",
     "sqlmap": "sqlmap"
   },
+  "wordlists": {
+    "common": "configs/wordlists/common.txt"
+  },
   "notifications": {
     "platform": "none",
     "local": true

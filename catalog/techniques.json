@@ -1,0 +1,456 @@
+[
+  {
+    "id": "BB01.001",
+    "name": "组织信息发现",
+    "tactic_id": "BB01",
+    "description": "识别与目标组织相关的公开可观察信息。",
+    "executor": "organization-discovery",
+    "mode": "passive",
+    "tools": [],
+    "mitre": [
+      "T1589"
+    ],
+    "tags": [
+      "reconnaissance",
+      "organization"
+    ]
+  },
+  {
+    "id": "BB01.002",
+    "name": "域名发现",
+    "tactic_id": "BB01",
+    "description": "识别与授权目标相关的域名。",
+    "executor": "domain-discovery",
+    "mode": "passive",
+    "tools": [
+      "whois"
+    ],
+    "mitre": [
+      "T1589.001"
+    ],
+    "tags": [
+      "domain",
+      "reconnaissance"
+    ]
+  },
+  {
+    "id": "BB01.003",
+    "name": "子域名枚举",
+    "tactic_id": "BB01",
+    "description": "识别与授权目标相关的子域名。",
+    "executor": "subdomain-enumeration",
+    "mode": "passive",
+    "tools": [
+      "subfinder"
+    ],
+    "mitre": [
+      "T1595"
+    ],
+    "tags": [
+      "subdomain",
+      "dns"
+    ]
+  },
+  {
+    "id": "BB01.004",
+    "name": "证书透明度枚举",
+    "tactic_id": "BB01",
+    "description": "通过证书透明度数据识别与目标相关的主机名。",
+    "executor": "certificate-transparency",
+    "mode": "passive",
+    "tools": [
+      "crtsh"
+    ],
+    "mitre": [
+      "T1596.003"
+    ],
+    "tags": [
+      "certificate",
+      "reconnaissance"
+    ]
+  },
+  {
+    "id": "BB01.005",
+    "name": "ASN 枚举",
+    "tactic_id": "BB01",
+    "description": "识别与授权目标相关的自治系统信息。",
+    "executor": "asn-enumeration",
+    "mode": "passive",
+    "tools": [],
+    "mitre": [
+      "T1590.005"
+    ],
+    "tags": [
+      "asn",
+      "network"
+    ]
+  },
+  {
+    "id": "BB01.006",
+    "name": "IP 段发现",
+    "tactic_id": "BB01",
+    "description": "识别与授权目标相关的 IP 段。",
+    "executor": "ip-range-discovery",
+    "mode": "passive",
+    "tools": [],
+    "mitre": [
+      "T1590.005"
+    ],
+    "tags": [
+      "ip",
+      "network"
+    ]
+  },
+  {
+    "id": "BB01.007",
+    "name": "WHOIS 枚举",
+    "tactic_id": "BB01",
+    "description": "收集与授权目标相关的注册信息。",
+    "executor": "whois-enumeration",
+    "mode": "passive",
+    "tools": [
+      "whois"
+    ],
+    "mitre": [
+      "T1596.002"
+    ],
+    "tags": [
+      "whois"
+    ]
+  },
+  {
+    "id": "BB01.008",
+    "name": "DNS 枚举",
+    "tactic_id": "BB01",
+    "description": "枚举与授权目标相关的 DNS 记录。",
+    "executor": "dns-enumeration",
+    "mode": "passive",
+    "tools": [
+      "dig"
+    ],
+    "mitre": [
+      "T1590.002"
+    ],
+    "tags": [
+      "dns"
+    ]
+  },
+  {
+    "id": "BB01.009",
+    "name": "反向 DNS 枚举",
+    "tactic_id": "BB01",
+    "description": "识别与已发现 IP 地址相关的主机名。",
+    "executor": "reverse-dns",
+    "mode": "passive",
+    "tools": [
+      "dig"
+    ],
+    "mitre": [
+      "T1590.002"
+    ],
+    "tags": [
+      "dns",
+      "reverse-dns"
+    ]
+  },
+  {
+    "id": "BB01.010",
+    "name": "历史 DNS 发现",
+    "tactic_id": "BB01",
+    "description": "识别与目标相关的历史 DNS 关系。",
+    "executor": "historical-dns",
+    "mode": "passive",
+    "tools": [],
+    "mitre": [
+      "T1596.002"
+    ],
+    "tags": [
+      "dns",
+      "historical"
+    ]
+  },
+  {
+    "id": "BB02.001",
+    "name": "存活主机发现",
+    "tactic_id": "BB02",
+    "description": "识别授权目标范围内可访问的主机。",
+    "executor": "live-host-discovery",
+    "mode": "active",
+    "tools": [
+      "httpx"
+    ],
+    "mitre": [
+      "T1595"
+    ],
+    "tags": [
+      "host",
+      "discovery"
+    ]
+  },
+  {
+    "id": "BB02.005",
+    "name": "端口发现",
+    "tactic_id": "BB02",
+    "description": "识别授权目标范围内暴露的网络端口。",
+    "executor": "port-discovery",
+    "mode": "active",
+    "tools": [
+      "nmap"
+    ],
+    "mitre": [
+      "T1046"
+    ],
+    "tags": [
+      "network",
+      "port"
+    ]
+  },
+  {
+    "id": "BB05.001",
+    "name": "目录枚举",
+    "tactic_id": "BB05",
+    "description": "识别授权 Web 目标中可访问的目录和资源。",
+    "executor": "directory-enumeration",
+    "mode": "active",
+    "tools": [
+      "ffuf"
+    ],
+    "mitre": [
+      "T1083"
+    ],
+    "tags": [
+      "web",
+      "directory",
+      "fuzzing"
+    ]
+  },
+  {
+    "id": "BB05.003",
+    "name": "端点发现",
+    "tactic_id": "BB05",
+    "description": "识别授权 Web 目标中的应用端点。",
+    "executor": "endpoint-discovery",
+    "mode": "active",
+    "tools": [
+      "ffuf",
+      "httpx"
+    ],
+    "mitre": [
+      "T1046"
+    ],
+    "tags": [
+      "web",
+      "endpoint"
+    ]
+  },
+  {
+    "id": "BB07.001",
+    "name": "登录流程分析",
+    "tactic_id": "BB07",
+    "description": "评估应用的认证流程与安全边界。",
+    "executor": "login-flow-analysis",
+    "mode": "manual",
+    "tools": [],
+    "mitre": [],
+    "tags": [
+      "authentication",
+      "login"
+    ]
+  },
+  {
+    "id": "BB08.001",
+    "name": "IDOR 测试",
+    "tactic_id": "BB08",
+    "description": "评估对象引用是否可在授权安全上下文之外被访问。",
+    "executor": "idor",
+    "mode": "manual",
+    "tools": [],
+    "mitre": [],
+    "tags": [
+      "authorization",
+      "idor",
+      "access-control"
+    ]
+  },
+  {
+    "id": "BB10.001",
+    "name": "SQL 注入",
+    "tactic_id": "BB10",
+    "description": "评估授权应用输入中的 SQL 注入漏洞。",
+    "executor": "sql-injection",
+    "mode": "active",
+    "tools": [
+      "sqlmap"
+    ],
+    "mitre": [
+      "T1190"
+    ],
+    "tags": [
+      "injection",
+      "sql"
+    ]
+  },
+  {
+    "id": "BB11.001",
+    "name": "反射型 XSS",
+    "tactic_id": "BB11",
+    "description": "评估授权应用的输入与响应中是否存在反射型跨站脚本。",
+    "executor": "reflected-xss",
+    "mode": "active",
+    "tools": [
+      "nuclei"
+    ],
+    "mitre": [
+      "T1189"
+    ],
+    "tags": [
+      "xss",
+      "client-side"
+    ]
+  },
+  {
+    "id": "BB12.001",
+    "name": "SSRF 发现",
+    "tactic_id": "BB12",
+    "description": "评估授权服务端 URL 处理中是否存在请求伪造条件。",
+    "executor": "ssrf",
+    "mode": "active",
+    "tools": [],
+    "mitre": [
+      "T1090"
+    ],
+    "tags": [
+      "ssrf",
+      "server-side"
+    ]
+  },
+  {
+    "id": "BB13.001",
+    "name": "路径遍历",
+    "tactic_id": "BB13",
+    "description": "评估授权文件与资源路径中的遍历弱点。",
+    "executor": "path-traversal",
+    "mode": "active",
+    "tools": [
+      "nuclei"
+    ],
+    "mitre": [
+      "T1083"
+    ],
+    "tags": [
+      "path-traversal",
+      "file"
+    ]
+  },
+  {
+    "id": "BB14.001",
+    "name": "工作流绕过",
+    "tactic_id": "BB14",
+    "description": "评估应用必需的工作流步骤是否可以被绕过。",
+    "executor": "workflow-bypass",
+    "mode": "manual",
+    "tools": [],
+    "mitre": [],
+    "tags": [
+      "business-logic",
+      "workflow"
+    ]
+  },
+  {
+    "id": "BB14.003",
+    "name": "竞态条件测试",
+    "tactic_id": "BB14",
+    "description": "评估授权状态变更操作中的并发弱点。",
+    "executor": "race-condition",
+    "mode": "active",
+    "tools": [],
+    "mitre": [],
+    "tags": [
+      "business-logic",
+      "race-condition"
+    ]
+  },
+  {
+    "id": "BB15.005",
+    "name": "批量赋值",
+    "tactic_id": "BB15",
+    "description": "评估 API 对象属性是否可在预期授权边界之外被修改。",
+    "executor": "mass-assignment",
+    "mode": "manual",
+    "tools": [],
+    "mitre": [],
+    "tags": [
+      "api",
+      "authorization"
+    ]
+  },
+  {
+    "id": "BB16.011",
+    "name": "Git 仓库泄露",
+    "tactic_id": "BB16",
+    "description": "检测授权 Web 目标上暴露的 Git 仓库元数据。",
+    "executor": "git-exposure",
+    "mode": "active",
+    "tools": [
+      "nuclei"
+    ],
+    "mitre": [
+      "T1213"
+    ],
+    "tags": [
+      "git",
+      "configuration",
+      "disclosure"
+    ]
+  },
+  {
+    "id": "BB17.002",
+    "name": "敏感信息泄露",
+    "tactic_id": "BB17",
+    "description": "识别意外暴露的凭证、API 密钥或其他敏感信息。",
+    "executor": "secret-discovery",
+    "mode": "passive",
+    "tools": [],
+    "mitre": [
+      "T1552"
+    ],
+    "tags": [
+      "secrets",
+      "credentials"
+    ]
+  },
+  {
+    "id": "BB18.002",
+    "name": "公共存储桶检测",
+    "tactic_id": "BB18",
+    "description": "识别授权范围内可公开访问的云存储资源。",
+    "executor": "public-bucket-detection",
+    "mode": "active",
+    "tools": [],
+    "mitre": [
+      "T1530"
+    ],
+    "tags": [
+      "cloud",
+      "storage"
+    ]
+  },
+  {
+    "id": "BB22.001",
+    "name": "已知 CVE 检测",
+    "tactic_id": "BB22",
+    "description": "识别影响已发现授权组件的已知漏洞。",
+    "executor": "cve-detection",
+    "mode": "active",
+    "tools": [
+      "nuclei"
+    ],
+    "mitre": [
+      "T1203"
+    ],
+    "tags": [
+      "cve",
+      "vulnerability"
+    ]
+  }
+]

@@ -16,8 +16,10 @@ if [ -n "$STAGED_GO_FILES" ]; then
     echo "==> gofmt 检查通过"
 fi
 
+# test/ 目录仅存放 *_test.go 测试文件，不产生构建产物，需从 build 目标中排除
+BUILD_TARGETS=$(go list ./... | grep -v '/test$')
 echo "==> go build ./..."
-go build ./... &
+go build $BUILD_TARGETS &
 if ! wait $!; then
     echo "==> go build 失败，提交已中止"
     exit 1

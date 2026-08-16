@@ -10,7 +10,7 @@
 - `(*Runner).Run(ctx, arguments []string) (*Result, error)`
 - `Result{Stdout, Stderr string; ExitCode int}`
 
-所有工具路径来自 `configs/redteam.json` 的 `tools` 段，禁止硬编码。
+所有工具在 `configs/redteam.json` 的 `tools` 段声明。值为命令名时经 PATH 解析（推荐，跨机器可用）；值为绝对路径时直接使用该二进制。禁止硬编码工具位置。
 
 ## 适配器清单
 

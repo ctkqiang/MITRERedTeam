@@ -212,17 +212,17 @@ catalog（BB05.001）
 
 ### configs/redteam.json
 
-运行配置，工具路径必须在此声明，禁止硬编码进代码。
+运行配置，工具必须在 `tools` 段声明。值为**命令名**时经 PATH 解析（推荐，跨机器可用）；值为绝对路径时直接使用该二进制。禁止在代码中硬编码工具位置。
 
 ```json
 {
   "tools": {
-    "ffuf": "/usr/local/bin/ffuf",
-    "nmap": "/usr/local/bin/nmap",
-    "nuclei": "/usr/local/bin/nuclei",
-    "httpx": "/usr/local/bin/httpx",
-    "subfinder": "/usr/local/bin/subfinder",
-    "sqlmap": "/usr/local/bin/sqlmap"
+    "ffuf": "ffuf",
+    "nmap": "nmap",
+    "nuclei": "nuclei",
+    "httpx": "httpx",
+    "subfinder": "subfinder",
+    "sqlmap": "sqlmap"
   }
 }
 ```

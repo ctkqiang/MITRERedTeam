@@ -184,3 +184,44 @@ func TestConfirmDefaultFallback(t *testing.T) {
 		}
 	}
 }
+
+// 验证非交互环境（stdin 为管道）跳过交互询问，直接使用默认字典，且不阻塞。
+func TestResolveWordlistPathNonInteractiveFallback(t *testing.T) {
+	defaultPath := writeTestWordlist(t, "admin\n")
+	pipeReader, pipeWriter, pipeErr := os.Pipe()
+	if pipeErr != nil {
+		t.Fatalf("创建管道失败: %v", pipeErr)
+	}
+	defer pipeReader.Close()
+	defer pipeWriter.Close()
+
+	var output strings.Builder
+	chosen, err := enumeration.ResolveWordlistPath("", defaultPath, pipeReader, &output)
+	if err != nil {
+		t.Fatalf("解析失败: %v", err)
+	}
+	if chosen != defaultPath {
+		t.Errorf("期望非交互环境使用默认字典 %s，实际 %s", defaultPath, chosen)
+	}
+	if !strings.Contains(output.String(), "默认字典") {
+		t.Errorf("提示信息应说明回退到默认字典，实际: %q", output.String())
+	}
+}
+
+// 验证非交互环境无法确认回退时返回拒绝，避免无声阻塞。
+func TestConfirmDefaultFallbackNonInteractive(t *testing.T) {
+	pipeReader, pipeWriter, pipeErr := os.Pipe()
+	if pipeErr != nil {
+		t.Fatalf("创建管道失败: %v", pipeErr)
+	}
+	defer pipeReader.Close()
+	defer pipeWriter.Close()
+
+	var output strings.Builder
+	if got := enumeration.ConfirmDefaultFallback(pipeReader, &output); got {
+		t.Fatal("期望非交互环境拒绝回退，实际同意")
+	}
+	if !strings.Contains(output.String(), "无法确认回退") {
+		t.Errorf("提示信息应说明无法确认回退，实际: %q", output.String())
+	}
+}

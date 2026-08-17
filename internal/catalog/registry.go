@@ -3,23 +3,17 @@ package catalog
 import "mitre_red_team/internal/model"
 
 // GetTactic 按 ID 查找战术，未找到时返回 false。
+// 查找走加载期建立的索引，复杂度 O(1)。
 func (c *Catalog) GetTactic(id string) (model.Tactic, bool) {
-	for _, tactic := range c.Tactics {
-		if tactic.ID == id {
-			return tactic, true
-		}
-	}
-	return model.Tactic{}, false
+	tactic, found := c.tacticIndex[id]
+	return tactic, found
 }
 
 // GetTechnique 按 ID 查找技术，未找到时返回 false。
+// 查找走加载期建立的索引，复杂度 O(1)。
 func (c *Catalog) GetTechnique(id string) (model.Technique, bool) {
-	for _, technique := range c.Techniques {
-		if technique.ID == id {
-			return technique, true
-		}
-	}
-	return model.Technique{}, false
+	technique, found := c.techniqueIndex[id]
+	return technique, found
 }
 
 // TechniquesByTactic 返回指定战术下的技术列表，保持战术声明的顺序。

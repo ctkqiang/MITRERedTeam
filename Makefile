@@ -4,13 +4,14 @@
 #   make fmt      检查代码格式（gofmt -l 必须为空）
 #   make vet      静态分析
 #   make build    编译（排除 test 目录）
+#   make binary   构建 CLI 可执行文件到 build/ 目录
 #   make test     运行全部测试
 #   make lint     golangci-lint 静态检查（未安装时跳过）
 #   make vuln     依赖漏洞扫描（govulncheck，未安装时跳过）
 #   make clean    清理构建缓存
 #   make all      完整质量门禁：fmt + vet + build + test
 
-.PHONY: help run all fmt vet build test lint vuln clean
+.PHONY: help run all fmt vet build binary test lint vuln clean
 
 # 构建目标排除 test 目录：该目录仅存放 *_test.go，不产生构建产物
 BUILD_TARGETS := $(shell go list ./... | grep -v '/test$$')
@@ -22,6 +23,7 @@ help:
 	@echo "  make fmt      检查代码格式（gofmt -l 必须为空）"
 	@echo "  make vet      静态分析"
 	@echo "  make build    编译（排除 test 目录）"
+	@echo "  make binary   构建 CLI 可执行文件到 build/ 目录"
 	@echo "  make run      运行 CLI（可传参，如 make run ARGS=\"--technique BB05.001\")"
 	@echo "  make test     运行全部测试"
 	@echo "  make lint     golangci-lint 静态检查（未安装时跳过）"
@@ -54,6 +56,12 @@ vet:
 build:
 	go build $(BUILD_TARGETS)
 	@echo "==> go build 通过"
+
+# 构建 CLI 可执行文件。产物统一输出到 build/ 目录，避免污染仓库根目录
+binary:
+	mkdir -p build
+	go build -o build/mitre_red_team ./cmd/mitre_red_team
+	@echo "==> 已生成 build/mitre_red_team"
 
 # 单元测试
 test:

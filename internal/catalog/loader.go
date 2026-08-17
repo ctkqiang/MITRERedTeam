@@ -20,7 +20,9 @@ func Load(directory string) (*Catalog, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &Catalog{Tactics: tactics, Techniques: techniques}, nil
+	catalogData := &Catalog{Tactics: tactics, Techniques: techniques}
+	catalogData.buildIndex()
+	return catalogData, nil
 }
 
 // loadTactics 流式解码 tactics.json 为战术列表。

@@ -3,3 +3,5 @@
 *.bin
 
 build/
+# go build ./cmd/mitre_red_team 在仓库根目录产生的可执行文件
+/mitre_red_team

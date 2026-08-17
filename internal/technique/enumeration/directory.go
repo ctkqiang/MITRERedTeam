@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 	"mitre_red_team/internal/model"
-	"mitre_red_team/tools"
+	"mitre_red_team/tools/ffuf"
 	"os"
 	"strconv"
 	"strings"
@@ -22,7 +22,7 @@ const directoryEnumerationPreviewLimit = 5
 
 // DirectoryEnumeration 使用 ffuf 枚举目标 Web 目录。
 type DirectoryEnumeration struct {
-	runner   *tools.Runner
+	fuzzer   *ffuf.Fuzzer
 	wordlist string
 }
 
@@ -30,7 +30,7 @@ type DirectoryEnumeration struct {
 // executablePath 为 ffuf 可执行文件路径，wordlist 为字典文件路径。
 func NewDirectoryEnumeration(executablePath string, wordlist string) *DirectoryEnumeration {
 	return &DirectoryEnumeration{
-		runner:   tools.NewRunner(executablePath, 60*time.Second),
+		fuzzer:   ffuf.New(executablePath, 60*time.Second),
 		wordlist: wordlist,
 	}
 }
@@ -52,16 +52,8 @@ func (d *DirectoryEnumeration) Execute(ctx context.Context, target model.Target)
 		url += ":" + strconv.Itoa(target.Port)
 	}
 
-	result, err := d.runner.Run(ctx, []string{
-		"-u", url + "/FUZZ",
-		"-w", d.wordlist,
-		"-mc", "200,301,302,403",
-		"-t", "20",
-		"-timeout", "10",
-		"-rate", "100",
-		"-maxtime", "50",
-		"-s",
-	})
+	// 参数构造收拢在 ffuf 适配器内，技术层只声明目标、字典与默认选项。
+	result, err := d.fuzzer.Fuzz(ctx, url+"/FUZZ", d.wordlist, ffuf.DefaultFuzzOptions())
 	if err != nil {
 		return model.ExecutionResult{
 			TechniqueID: "BB05.001",

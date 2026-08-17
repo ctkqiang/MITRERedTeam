@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"mitre_red_team/tools"
+	"mitre_red_team/tools/ffuf"
 	"mitre_red_team/tools/httpx"
 	"mitre_red_team/tools/nmap"
 	"mitre_red_team/tools/sqlmap"
@@ -108,5 +109,51 @@ func TestSqlmapAdapterArguments(t *testing.T) {
 	}
 	if !strings.Contains(result.Stdout, "-u https://example.com?id=1 --batch") {
 		t.Errorf("sqlmap 参数构造不符，stdout=%q", result.Stdout)
+	}
+}
+
+// 验证 ffuf 适配器按默认选项构造完整参数。
+func TestFfufAdapterArguments(t *testing.T) {
+	fuzzer := ffuf.New("/bin/echo", 5*time.Second)
+	result, err := fuzzer.Fuzz(context.Background(), "https://example.com/FUZZ", "/tmp/words.txt", ffuf.DefaultFuzzOptions())
+	if err != nil {
+		t.Fatalf("枚举失败: %v", err)
+	}
+	fragments := []string{
+		"-u https://example.com/FUZZ",
+		"-w /tmp/words.txt",
+		"-mc 200,301,302,403",
+		"-t 20",
+		"-timeout 10",
+		"-rate 100",
+		"-maxtime 50",
+		"-s",
+	}
+	for _, fragment := range fragments {
+		if !strings.Contains(result.Stdout, fragment) {
+			t.Errorf("ffuf 参数缺少 %q，stdout=%q", fragment, result.Stdout)
+		}
+	}
+}
+
+// 验证零值 FuzzOptions 不产生多余参数，仅保留必填的 -u 与 -w。
+func TestFfufAdapterZeroOptions(t *testing.T) {
+	fuzzer := ffuf.New("/bin/echo", 5*time.Second)
+	result, err := fuzzer.Fuzz(context.Background(), "https://example.com/FUZZ", "/tmp/words.txt", ffuf.FuzzOptions{})
+	if err != nil {
+		t.Fatalf("枚举失败: %v", err)
+	}
+	if result.Stdout != "-u https://example.com/FUZZ -w /tmp/words.txt\n" {
+		t.Errorf("零值选项应只保留必填参数，stdout=%q", result.Stdout)
+	}
+}
+
+// 验证 Succeeded 按退出码判断执行成败。
+func TestResultSucceeded(t *testing.T) {
+	if got := (&tools.Result{ExitCode: 0}).Succeeded(); !got {
+		t.Error("退出码 0 应视为成功")
+	}
+	if got := (&tools.Result{ExitCode: 1}).Succeeded(); got {
+		t.Error("非零退出码不应视为成功")
 	}
 }

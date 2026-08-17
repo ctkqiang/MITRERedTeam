@@ -15,6 +15,11 @@ type Result struct {
 	ExitCode int
 }
 
+// Succeeded 返回工具是否以零退出码完成，供调用方快速判断成功与否。
+func (r *Result) Succeeded() bool {
+	return r.ExitCode == 0
+}
+
 // Runner 封装外部工具的统一执行入口。
 type Runner struct {
 	executablePath string

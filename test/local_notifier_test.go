@@ -41,7 +41,13 @@ func TestBuildLinuxNotificationArgs(t *testing.T) {
 		Sound:    "message-new-instant",
 	})
 	joined := strings.Join(arguments, " ")
-	for _, fragment := range []string{"-i /tmp/icon.png", "-u critical", "-h string:sound-name:message-new-instant", "扫描完成 发现 3 个漏洞"} {
+	fragments := []string{
+		"-i /tmp/icon.png",
+		"-u critical",
+		"-h string:sound-name:message-new-instant",
+		"扫描完成 发现 3 个漏洞",
+	}
+	for _, fragment := range fragments {
 		if !strings.Contains(joined, fragment) {
 			t.Errorf("参数缺少 %q，实际 %v", fragment, arguments)
 		}
@@ -68,7 +74,13 @@ func TestScheduleShowsAfterDelay(t *testing.T) {
 		return nil
 	})
 
-	if err := utilities.Schedule(context.Background(), notifier, utilities.LocalNotification{}, 10*time.Millisecond); err != nil {
+	err := utilities.Schedule(
+		context.Background(),
+		notifier,
+		utilities.LocalNotification{},
+		10*time.Millisecond,
+	)
+	if err != nil {
 		t.Fatalf("调度执行失败: %v", err)
 	}
 	if !shown {

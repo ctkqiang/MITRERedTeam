@@ -27,7 +27,14 @@ type OpenClawNotifier struct {
 // NewOpenClawNotifier 创建 OpenClaw 通知器。
 // gatewayURL 为 gateway 地址（默认 http://localhost:18789）；apiToken 为空表示本机回环免认证；
 // channel 为目标渠道名（如 openclaw-weixin）；recipient 为接收方标识（由 gateway 侧定义）。
-func NewOpenClawNotifier(gatewayURL string, apiToken string, channel string, recipient string, httpClient *http.Client, logger *Logger) *OpenClawNotifier {
+func NewOpenClawNotifier(
+	gatewayURL string,
+	apiToken string,
+	channel string,
+	recipient string,
+	httpClient *http.Client,
+	logger *Logger,
+) *OpenClawNotifier {
 	return &OpenClawNotifier{
 		gatewayURL: gatewayURL,
 		apiToken:   apiToken,

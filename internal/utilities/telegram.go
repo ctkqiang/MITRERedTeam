@@ -24,7 +24,13 @@ type TelegramNotifier struct {
 // NewTelegramNotifier 创建 Telegram 通知器。
 // baseURL 生产环境传 telegramAPIBaseURL，测试时可指向本地 mock 服务。
 // httpClient 允许注入自定义客户端以便测试与超时控制。
-func NewTelegramNotifier(botToken string, chatID string, baseURL string, httpClient *http.Client, logger *Logger) *TelegramNotifier {
+func NewTelegramNotifier(
+	botToken string,
+	chatID string,
+	baseURL string,
+	httpClient *http.Client,
+	logger *Logger,
+) *TelegramNotifier {
 	return &TelegramNotifier{
 		baseURL:    baseURL,
 		botToken:   botToken,

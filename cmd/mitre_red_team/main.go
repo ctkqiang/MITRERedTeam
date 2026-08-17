@@ -88,11 +88,21 @@ func main() {
 		os.Exit(1)
 	}
 
-	var results []model.ExecutionResult
 	executionEngine := engine.New(catalogData)
+
+	var results []model.ExecutionResult
+
 	switch {
 	case *aiMode:
-		results, err = runAI(context.Background(), executionEngine, catalogData, target, *mitreID, *techniqueID, *tacticID)
+		results, err = runAI(
+			context.Background(),
+			executionEngine,
+			catalogData,
+			target,
+			*mitreID,
+			*techniqueID,
+			*tacticID,
+		)
 	case *mitreID != "":
 		results, err = executionEngine.ExecuteByMitre(context.Background(), target, *mitreID)
 	default:
@@ -102,6 +112,7 @@ func main() {
 			TacticID:    *tacticID,
 		})
 	}
+
 	if err != nil {
 		fmt.Fprintln(os.Stderr, "错误:", err)
 		os.Exit(1)
@@ -155,7 +166,15 @@ func resolveWordlist(configuration *config.Config, manualWordlist string) (strin
 
 // runAI 以 AI 辅助模式执行：从已配置的 LLM 供应商中随机选择一家，
 // 执行用户请求的初始技术，把执行输出交给 LLM 分析，并自动推进建议的下一步技术。
-func runAI(ctx context.Context, executionEngine *engine.Engine, catalogData *catalog.Catalog, target model.Target, mitreID string, techniqueID string, tacticID string) ([]model.ExecutionResult, error) {
+func runAI(
+	ctx context.Context,
+	executionEngine *engine.Engine,
+	catalogData *catalog.Catalog,
+	target model.Target,
+	mitreID string,
+	techniqueID string,
+	tacticID string,
+) ([]model.ExecutionResult, error) {
 	initial := func(ctx context.Context) ([]model.ExecutionResult, error) {
 		if mitreID != "" {
 			return executionEngine.ExecuteByMitre(ctx, target, mitreID)

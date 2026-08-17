@@ -36,7 +36,11 @@ func (e *Engine) Execute(ctx context.Context, request model.ExecutionRequest) ([
 }
 
 // ExecuteByMitre 执行映射到指定 MITRE ATT&CK ID 的所有已实现技术。
-func (e *Engine) ExecuteByMitre(ctx context.Context, target model.Target, mitreID string) ([]model.ExecutionResult, error) {
+func (e *Engine) ExecuteByMitre(
+	ctx context.Context,
+	target model.Target,
+	mitreID string,
+) ([]model.ExecutionResult, error) {
 	techniques := e.catalogData.TechniquesByMitreID(mitreID)
 	if len(techniques) == 0 {
 		return nil, fmt.Errorf("未找到映射到 MITRE %s 的技术", mitreID)
@@ -45,7 +49,11 @@ func (e *Engine) ExecuteByMitre(ctx context.Context, target model.Target, mitreI
 }
 
 // executeTechnique 执行单条技术：目录查询 + 注册表解析 + 执行。
-func (e *Engine) executeTechnique(ctx context.Context, target model.Target, techniqueID string) (model.ExecutionResult, error) {
+func (e *Engine) executeTechnique(
+	ctx context.Context,
+	target model.Target,
+	techniqueID string,
+) (model.ExecutionResult, error) {
 	metadata, found := e.catalogData.GetTechnique(techniqueID)
 	if !found {
 		return model.ExecutionResult{}, fmt.Errorf("技术 %s 不在目录中", techniqueID)
@@ -58,7 +66,11 @@ func (e *Engine) executeTechnique(ctx context.Context, target model.Target, tech
 }
 
 // executeTactic 执行某战术下所有已实现的技术。
-func (e *Engine) executeTactic(ctx context.Context, target model.Target, tacticID string) ([]model.ExecutionResult, error) {
+func (e *Engine) executeTactic(
+	ctx context.Context,
+	target model.Target,
+	tacticID string,
+) ([]model.ExecutionResult, error) {
 	techniques := e.catalogData.TechniquesByTactic(tacticID)
 	if len(techniques) == 0 {
 		return nil, fmt.Errorf("战术 %s 下没有已实现的技术", tacticID)
@@ -68,7 +80,11 @@ func (e *Engine) executeTactic(ctx context.Context, target model.Target, tacticI
 
 // executeTechniques 顺序执行一组已实现的技术。
 // 规划中的技术允许未实现，跳过不中断；全部未实现时返回错误，不静默成功。
-func (e *Engine) executeTechniques(ctx context.Context, target model.Target, techniques []model.Technique) ([]model.ExecutionResult, error) {
+func (e *Engine) executeTechniques(
+	ctx context.Context,
+	target model.Target,
+	techniques []model.Technique,
+) ([]model.ExecutionResult, error) {
 	var results []model.ExecutionResult
 	for _, metadata := range techniques {
 		implementation, registered := technique.Get(metadata.Executor)

@@ -18,7 +18,13 @@ type Decision struct {
 // BuildDecisionPrompt 构造要求 LLM 分析 TTP 执行结果的系统与用户提示词。
 // 系统提示词限定 LLM 只能从目录中的技术里选择下一步，且必须输出指定 JSON 结构；
 // 用户提示词携带目标、执行历史与当前轮数，供 LLM 结合上下文决策。
-func BuildDecisionPrompt(target model.Target, techniques []model.Technique, history []model.ExecutionResult, round int, maxRounds int) (systemPrompt string, userPrompt string) {
+func BuildDecisionPrompt(
+	target model.Target,
+	techniques []model.Technique,
+	history []model.ExecutionResult,
+	round int,
+	maxRounds int,
+) (systemPrompt string, userPrompt string) {
 	systemPrompt = "你是授权红队评估的战术决策助手。" +
 		"你会收到某次安全技术（TTP）对指定目标执行后的结果。" +
 		"请分析结果并只推荐下一步最合理的单条技术，技术必须从给定列表中选取。" +

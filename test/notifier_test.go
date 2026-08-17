@@ -67,7 +67,14 @@ func TestOpenClawNotifierSendsMessage(t *testing.T) {
 	defer server.Close()
 
 	logger, _ := newTestLogger()
-	notifier := utilities.NewOpenClawNotifier(server.URL, "gateway-token", "openclaw-weixin", "me", server.Client(), logger)
+	notifier := utilities.NewOpenClawNotifier(
+		server.URL,
+		"gateway-token",
+		"openclaw-weixin",
+		"me",
+		server.Client(),
+		logger,
+	)
 	if err := notifier.Send(context.Background(), "扫描完成"); err != nil {
 		t.Fatalf("发送失败: %v", err)
 	}

@@ -79,7 +79,13 @@ func Run(ctx context.Context, params RunParams) ([]model.ExecutionResult, error)
 	}
 
 	for round := 1; round <= maxRounds; round++ {
-		systemPrompt, userPrompt := BuildDecisionPrompt(params.Target, params.CatalogData.Techniques, history, round, maxRounds)
+		systemPrompt, userPrompt := BuildDecisionPrompt(
+			params.Target,
+			params.CatalogData.Techniques,
+			history,
+			round,
+			maxRounds,
+		)
 		output, err := client.Complete(ctx, systemPrompt, userPrompt)
 		if err != nil {
 			return nil, fmt.Errorf("第 %d 轮 LLM 调用失败: %w", round, err)

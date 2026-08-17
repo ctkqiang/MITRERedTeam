@@ -124,7 +124,12 @@ func TestResolveWordlistPathManual(t *testing.T) {
 
 // 验证手动路径无效时返回错误，不静默回退。
 func TestResolveWordlistPathManualInvalid(t *testing.T) {
-	_, err := enumeration.ResolveWordlistPath("/nonexistent/custom.txt", "/nonexistent/default.txt", strings.NewReader(""), io.Discard)
+	_, err := enumeration.ResolveWordlistPath(
+		"/nonexistent/custom.txt",
+		"/nonexistent/default.txt",
+		strings.NewReader(""),
+		io.Discard,
+	)
 	if err == nil {
 		t.Fatal("期望无效手动字典报错，实际无错误")
 	}
@@ -134,7 +139,12 @@ func TestResolveWordlistPathManualInvalid(t *testing.T) {
 func TestResolveWordlistPathPromptInput(t *testing.T) {
 	custom := writeTestWordlist(t, "admin\n")
 	var promptOutput strings.Builder
-	chosen, err := enumeration.ResolveWordlistPath("", "/nonexistent/default.txt", strings.NewReader(custom+"\n"), &promptOutput)
+	chosen, err := enumeration.ResolveWordlistPath(
+		"",
+		"/nonexistent/default.txt",
+		strings.NewReader(custom+"\n"),
+		&promptOutput,
+	)
 	if err != nil {
 		t.Fatalf("解析失败: %v", err)
 	}

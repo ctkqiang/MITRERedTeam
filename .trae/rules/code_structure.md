@@ -241,6 +241,73 @@ func NewEngine(loader CatalogLoader, runner ToolRunner) *Engine {
 }
 ```
 
+### 反冗余与代码复用
+
+代码出现重复时，不得复制粘贴了事。重复的信号包括：结构相同、仅参数或值不同的代码块；需要在多处同步修改的字面量与分支；逐处手写相同的查找或转换逻辑。对这些模式，用映射结构（map）、循环（for/range）或提取公共函数集中处理，保证增删修改只落在一处。
+
+```go
+// 反例：两处手写相同的线性查找，新增字段时需同步改两处
+func findTactic(tactics []Tactic, id string) (Tactic, bool) {
+	for _, tactic := range tactics {
+		if tactic.ID == id {
+			return tactic, true
+		}
+	}
+	return Tactic{}, false
+}
+
+func findTechnique(techniques []Technique, id string) (Technique, bool) {
+	for _, technique := range techniques {
+		if technique.ID == id {
+			return technique, true
+		}
+	}
+	return Technique{}, false
+}
+
+// 正例：加载阶段统一建立 ID 索引，查找集中在一处且为 O(1)
+type Catalog struct {
+	byTacticID    map[string]Tactic
+	byTechniqueID map[string]Technique
+}
+
+func (c *Catalog) index() {
+	c.byTacticID = make(map[string]Tactic, len(c.tactics))
+	for _, tactic := range c.tactics {
+		c.byTacticID[tactic.ID] = tactic
+	}
+	// byTechniqueID 同理，循环遍历一次完成建表
+}
+
+func (c *Catalog) GetTactic(id string) (Tactic, bool) {
+	tactic, found := c.byTacticID[id]
+	return tactic, found
+}
+```
+
+```go
+// 反例：同一键值映射散落在各函数里，维护时容易漏改
+if toolName == "nmap" {
+	toolPath = "/usr/local/bin/nmap"
+}
+// ... 另一处
+if toolName == "nmap" {
+	toolPath = "/usr/local/bin/nmap"
+}
+
+// 正例：映射表集中声明，查表取代逐条判断
+var toolDefaultPaths = map[string]string{
+	"nmap":   "/usr/local/bin/nmap",
+	"nuclei": "/usr/local/bin/nuclei",
+}
+
+func defaultToolPath(toolName string) string {
+	return toolDefaultPaths[toolName]
+}
+```
+
+注意边界：反冗余不等同于强行抽象。只有模式真正重复（出现两处及以上且会同步演化）才集中化；一次性或语义差异过大的相似代码，保留直白写法更清晰。
+
 ## 6. 格式规范
 
 - 以 `gofmt` 输出为准，`gofmt -l` 必须为空。
@@ -259,11 +326,41 @@ import (
 - 长行优先通过换行保持可读，不截断语义；结构体字段对齐交给 gofmt。
 - `golangci-lint` 建议启用 `govet`、`staticcheck`、`ineffassign`、`unused` 等默认检查项。
 
+### 可读性排版
+
+gofmt 保证语法格式统一，但逻辑分段需要人工维护。具体要求：
+
+- 用空行分隔不同职责的逻辑块与函数；同一函数内，变量准备、错误处理、结果汇总等段落之间用空行隔开，避免整段粘连。
+- 嵌套结构保持一致的 Tab 缩进，每层一个 Tab，不得混用空格；分支层级必须能一眼分辨。
+- 运算符、逗号、冒号两侧按 gofmt 规则留适当空白；关键表达式周围允许用空格提升可读性。
+- 整体要求：单屏内能分辨函数边界与分支层级，段落分明、不粘连。
+
+```go
+// 反例：错误处理与正常逻辑挤在一起，段落无法分辨
+results := engine.Execute(ctx, request)
+if err != nil {
+	return nil, err
+}
+summary := summarize(results)
+return summary, nil
+
+// 正例：错误处理独立成段，正常路径清晰可读
+results, err := engine.Execute(ctx, request)
+if err != nil {
+	return nil, fmt.Errorf("执行失败: %w", err)
+}
+
+summary := summarize(results)
+return summary, nil
+```
+
 ## 7. 提交前自查清单
 
 - 变量名完整且自解释，无单字母/难懂缩写。
 - 导出的标识符有中文文档注释，非导出的关键逻辑有中文注释。
 - 无分割线、步骤式、AI 味套话注释。
 - 错误均被处理或显式说明，stderr 未被吞。
+- 无重复代码段：重复模式已用映射结构、循环或公共函数集中，无散落的多处手写拷贝。
+- 排版可读：不同职责的逻辑块之间有换行分隔，嵌套缩进一致，段落不粘连。
 - `gofmt -l` 为空，`go vet` 无告警。
 - `go test ./...` 与 `golangci-lint run` 通过。

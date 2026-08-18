@@ -1,42 +1,35 @@
 # MITRERedTeam
 
-**基于 MITRE ATT&CK 的授权红队评估 CLI 工具**
+**授权范围内的红队 / 漏洞赏金 CLI 安全工具**
 
 > **作者**：钟智强 · **许可证**：[GPLv3](https://www.gnu.org/licenses/gpl-3.0.html)
 
 ## 目录
 
 - [项目概述](#项目概述)
+- [技术规格](#技术规格)
 - [系统架构](#系统架构)
-- [执行时序](#执行时序)
+- [执行流程](#执行流程)
 - [支持的战术](#支持的战术)
 - [支持的技术](#支持的技术)
 - [工具集成](#工具集成)
-- [执行模式](#执行模式)
+- [CLI 参考（API）](#cli-参考api)
+- [配置指南](#配置指南)
 - [AI 辅助执行](#ai-辅助执行)
 - [通知系统](#通知系统)
 - [日志系统](#日志系统)
-- [项目结构](#项目结构)
-- [编译与运行](#编译与运行)
-  - [前置条件](#前置条件)
-  - [安装依赖](#安装依赖)
-  - [方式一：直接运行](#方式一直接运行)
-  - [方式二：Make 构建](#方式二make-构建)
-- [CLI 用法](#cli-用法)
-- [快速上手](#快速上手)
-- [运行输出](#运行输出)
-- [配置说明](#配置说明)
+- [目录数据结构](#目录数据结构)
 - [扩展指南](#扩展指南)
-- [安全最佳实践](#安全最佳实践)
-- [技术实现细节](#技术实现细节)
+- [故障排查](#故障排查)
+- [版本历史](#版本历史)
 - [依赖项](#依赖项)
 - [许可证](#许可证)
 
 ## 项目概述
 
-MITRERedTeam 是一个用 **Go** 编写的授权红队 / 漏洞赏金 CLI 安全工具。它以 MITRE ATT&CK 战术与技术模型为骨架，把完整的评估流程拆分为**战术（Tactic）**与**技术（Technique）**两级，用户显式选择单条技术或整个战术执行，应用绝不自动编排所有内容，也不扩大用户声明的目标范围。
+MITRERedTeam 是一个用 **Go** 编写的授权红队 / 漏洞赏金 CLI 安全工具。它把完整的评估流程拆分为**战术（Tactic）**与**技术（Technique）**两级，采用自研稳定编号（`BBxx` 战术、`BBxx.xxx` 技术）作为主键，用户显式选择单条技术或整个战术执行，应用绝不自动编排所有内容，也不扩大用户声明的目标范围。
 
-战术与技术清单由 `catalog/*.json` 外部数据驱动，技术主键采用自研稳定编号（`BBxx` 战术、`BBxx.xxx` 技术），MITRE ATT&CK ID 仅作为行业标准对齐的元数据。当前目录覆盖 **25 个战术、27 条技术**，并已落地目录枚举执行器与六类外部工具适配层。
+战术与技术清单由 `catalog/*.json` 外部数据驱动，MITRE ATT&CK ID 仅作为对齐行业标准的元数据，不作为主标识符。当前目录覆盖 **25 个战术、27 条技术**，并已落地目录枚举执行器与六类外部工具适配层。
 
 **核心特性：**
 
@@ -48,9 +41,53 @@ MITRERedTeam 是一个用 **Go** 编写的授权红队 / 漏洞赏金 CLI 安全
 | 显式执行 | 用户通过 `--technique` / `--tactic` / `--mitre` 显式触发，严格限定在声明目标内 |
 | 工具适配层 | ffuf、nmap、nuclei、httpx、subfinder、sqlmap 统一封装，参数构造与超时收敛在适配层 |
 | 结构化日志 | 全链路日志携带 RFC3339 时间戳、级别、操作名与内存统计，便于诊断 |
-| AI 辅助模式 | 对接六家 LLM 供应商，分析 TTP 执行输出并自动推进建议的下一步技术 |
+| AI 辅助模式 | 对接六家 LLM 供应商，分析 TTP 执行输出并自动推进建议的下一步技术（最多 3 轮） |
 | 通知系统 | Telegram、OpenClaw 微信、本地系统通知三通道 |
 | 零第三方依赖 | 仅使用 Go 标准库，Go 1.26 实现 |
+
+## 技术规格
+
+### 运行环境要求
+
+| 项目 | 要求 |
+|---|---|
+| Go 版本 | ≥ 1.26（`go.mod` 声明 `go 1.26.1`） |
+| 操作系统 | 支持 Go 编译目标：macOS / Linux / Windows |
+| 本地通知 | macOS（osascript）、Linux（notify-send）、Windows（原生 API），按编译平台自动选择 |
+| 第三方依赖 | 零 Go 第三方依赖，仅标准库 |
+
+### 外部工具要求
+
+| 工具 | 用途 | 典型技术 |
+|---|---|---|
+| ffuf | Web 目录/参数枚举 | BB05.001 目录枚举 |
+| nmap | 端口扫描 | BB02.005 端口发现 |
+| nuclei | 已知 CVE 检测 | BB22.001 已知 CVE 检测 |
+| httpx | HTTP 存活探测 | BB02.001 存活主机发现 |
+| subfinder | 子域名枚举 | BB01.003 子域名枚举 |
+| sqlmap | SQL 注入检测 | BB10.001 SQL 注入 |
+
+工具路径在 `configs/redteam.json` 的 `tools` 段声明：值为命令名时经 PATH 解析（推荐，跨机器可用）；值为绝对路径时直接使用该二进制。**禁止硬编码工具位置。**
+
+### 设计约束（硬性边界）
+
+- 应用**不是** AI agent，**不得**自动编排执行所有战术。
+- 执行必须由用户显式选择，且严格限定在用户声明的目标范围内。
+- 战术与技术清单**数据驱动**，存放在 `catalog/` 外部 JSON 中，不得硬编码进 Go 代码。
+- 外部命令一律 `exec.CommandContext(ctx, executable, arguments...)`，参数切片传递，不做 shell 解释；禁止 `sh -c`。
+- 所有外部调用带 context 超时；工具输出按行数上限约束，防止异常输出拖垮本地资源。
+- 技术实现不得直接执行 `exec.Command`，统一经 `tools/` 适配层调用外部工具。
+- 凭据与 API Key 只存内存，不回显、不落盘、不写日志。
+
+### 性能与内存指标
+
+| 指标 | 约束 |
+|---|---|
+| 运行期常驻内存（RSS）峰值 | ≤ 500MB |
+| `GOMEMLIMIT` | 480MiB 软限制（可经配置覆盖，上限 500MB） |
+| 并发外部工具进程 | 信号量限制（默认最多 4 个） |
+| catalog 加载 | `json.Decoder` 流式解码，内存占用与单条记录成正比 |
+| 运行时监控 | 每 5 秒采样 `runtime.ReadMemStats`，连续 3 次超限则退出 |
 
 ## 系统架构
 
@@ -62,23 +99,41 @@ MITRERedTeam 采用**目录驱动的注册式插件架构**（Catalog-Driven Reg
 
 | 层 | 职责 |
 |---|---|
-| CLI | 解析用户请求（`--tactic` / `--technique` / `--mitre` / `--url`），仅执行用户选定项 |
+| CLI（`cmd/mitre_red_team`） | 解析用户请求（`--tactic` / `--technique` / `--mitre` / `--url`），仅执行用户选定项 |
 | Planner | 把用户请求解析为可执行的执行计划 |
-| Engine | 编排执行：目录查询、计划调度、结果汇总 |
-| Technique Registry | 维护 `executor → 实现` 的注册表，按名称解析 |
-| 领域技术 | 具体技术实现，按领域分目录（recon、enumeration、injection 等） |
-| Tool 适配层 | 封装外部工具：路径解析、参数构造、超时、输出处理 |
+| Engine（`internal/engine`） | 编排执行：目录查询、计划调度、结果汇总 |
+| Technique Registry（`internal/technique`） | 维护 `executor → 实现` 的注册表，按名称解析 |
+| 领域技术 | 具体技术实现，按领域分目录（enumeration、injection 等） |
+| Tool 适配层（`tools/`） | 封装外部工具：路径解析、参数构造、超时、输出处理 |
 | Result / Evidence / Finding | 执行结果、证据与最终发现的递进产出 |
 
 完整链路：用户通过 CLI 提交请求 → Planner 生成执行计划 → Engine 校验目标并调度 → Technique Registry 按 `executor` 解析出领域技术实现 → 技术实现经 Tool 适配层调用外部工具（ffuf、nmap、nuclei 等）→ 产出结构化 Result。
 
-## 执行时序
+## 执行流程
 
-下图展示一次目录枚举技术（BB05.001）从 CLI 触发到外部工具执行、结果回传的完整时序：
+一次技术执行的完整时序如下：
 
 ![技术执行时序](docs/assets/sequence.png)
 
 📁 图表源码：[sequence.puml](docs/assets/sequence.puml) | 🖼️ PNG：[sequence.png](docs/assets/sequence.png)
+
+### 启动阶段
+
+1. **加载环境变量**：读取 `.env`（不存在或条目为空时静默忽略）。
+2. **加载配置**：解析 `configs/redteam.json`，含工具路径、字典、通知偏好。
+3. **加载 catalog**：流式解析 `catalog/tactics.json` 与 `catalog/techniques.json`，建立 ID 索引。
+4. **校验 catalog**：战术 ID 唯一、技术 ID 唯一、执行模式合法、技术引用的战术存在。
+5. **解析命令行参数**：目标必填，`--technique` / `--tactic` / `--mitre` 三选一。
+6. **检查依赖工具**：遍历配置声明，缺失时输出缺失清单与安装指引并退出。
+7. **解析字典**：优先 `--wordlist/-w`，否则交互询问（非交互环境直接回退默认字典）。
+
+### 执行阶段
+
+8. **注册技术实现**：把已实现的 executor 注册进 Technique Registry。
+9. **解析目标**：从 URL 提取主机、协议、端口。
+10. **调度执行**：按 `--technique` 单条 / `--tactic` 整战术 / `--mitre` 反查，生成执行计划。
+11. **逐条执行**：查询目录 → 注册表解析 executor → 调用技术实现 → 经工具适配层调用外部工具。
+12. **汇总结果**：按目录声明顺序收集 `ExecutionResult` 并输出。
 
 ## 支持的战术
 
@@ -112,7 +167,7 @@ MITRERedTeam 采用**目录驱动的注册式插件架构**（Catalog-Driven Reg
 
 ## 支持的技术
 
-`catalog/techniques.json` 当前收录 27 条技术，每条声明执行器、执行模式、依赖工具与 MITRE 映射。已实现状态指对应的 Go 执行器是否已在 `internal/technique/` 注册：
+`catalog/techniques.json` 当前收录 27 条技术，每条声明执行器、执行模式、依赖工具与 MITRE 映射。**已实现状态**指对应的 Go 执行器是否已在 `internal/technique/` 注册：
 
 | ID | 名称 | 战术 | 模式 | 工具 | MITRE | 已实现 |
 |---|---|---|---|---|---|---|
@@ -146,9 +201,17 @@ MITRERedTeam 采用**目录驱动的注册式插件架构**（Catalog-Driven Reg
 
 执行规划中的技术时，引擎会跳过未注册的执行器并明确提示，不静默成功。
 
+### 执行模式
+
+| 模式 | 含义 |
+|---|---|
+| passive | 被动评估，仅基于公开数据，不向目标发送主动请求 |
+| active | 主动评估，向目标发送探测或测试请求 |
+| manual | 需人工介入验证，工具只输出上下文与指引 |
+
 ## 工具集成
 
-所有外部工具经 `tools/` 适配层调用，统一处理路径解析、参数构造、context 超时、stdout/stderr 与退出码。技术实现不得直接执行 `exec.Command`。工具路径在 `configs/redteam.json` 的 `tools` 段声明，值为命令名时经 PATH 解析，值为绝对路径时直接使用。
+所有外部工具经 `tools/` 适配层调用，统一处理路径解析、参数构造、context 超时、stdout/stderr 与退出码。技术实现不得直接执行 `exec.Command`。
 
 | 工具 | 适配器 | 方法 | 典型参数 | 对应技术 |
 |---|---|---|---|---|
@@ -159,30 +222,149 @@ MITRERedTeam 采用**目录驱动的注册式插件架构**（Catalog-Driven Reg
 | subfinder | `Enumerator` | `Enumerate(ctx, domain)` | `-silent -d <domain>` | BB01.003 子域名枚举 |
 | sqlmap | `Injector` | `Inject(ctx, url)` | `-u <url> --batch` | BB10.001 SQL 注入 |
 
-## 执行模式
+统一执行器（`tools/interface.go`）：
 
-| 模式 | 含义 |
+- `tools.NewRunner(executablePath string, timeout time.Duration) *Runner`
+- `(*Runner).Run(ctx, arguments []string) (*Result, error)`
+- `Result{Stdout, Stderr string; ExitCode int}`
+- `(*Result).Succeeded() bool`：退出码为 0 时返回 true
+
+公共基座（`tools/adapter.go`）：
+
+- `tools.NewAdapter(executablePath string, timeout time.Duration) *Adapter`
+- `tools.DefaultToolTimeout = 60s`：`NewAdapter` 收到 ≤0 超时时自动回退，防止误传 0 立即超时
+
+## CLI 参考（API）
+
+### 命令格式
+
+```
+mitre_red_team --url <目标> [--technique <技术ID> | --tactic <战术ID> | --mitre <MITRE ID>] [选项]
+```
+
+### 参数
+
+| 参数 | 类型 | 必填 | 说明 |
+|---|---|---|---|
+| `--url <target>` | string | 是 | 目标 URL，如 `https://example.com` |
+| `--technique <ID>` | string | 条件必填 | 执行单条技术，如 `BB05.001` |
+| `--tactic <ID>` | string | 条件必填 | 执行整个战术，如 `BB05` |
+| `--mitre <ID>` | string | 条件必填 | 按 MITRE ATT&CK ID 执行，如 `T1046` |
+| `--wordlist / -w <path>` | string | 否 | 自定义字典文件路径（UTF-8，每行一条） |
+| `--ai` | bool | 否 | 启用 AI 辅助执行模式 |
+| `--config <path>` | string | 否 | 配置文件路径（默认 `configs/redteam.json`） |
+
+**选择器互斥**：`--technique`、`--tactic`、`--mitre` 三选一；未指定任何选择器或未提供 `--url` 时打印完整用法并退出。
+
+### 退出码
+
+| 退出码 | 含义 |
 |---|---|
-| passive | 被动评估，仅基于公开数据，不向目标发送主动请求 |
-| active | 主动评估，向目标发送探测或测试请求 |
-| manual | 需人工介入验证，工具只输出上下文与指引 |
+| 0 | 执行成功 |
+| 1 | 启动或执行阶段出错（配置加载、catalog 校验、参数非法、工具缺失、字典无效、执行失败等） |
+
+### 输出格式
+
+| 流 | 内容 |
+|---|---|
+| stdout | 每条技术一行结果：`<状态> <技术ID>: <摘要>` |
+| stderr | 结构化日志、错误信息与用户提示 |
+
+结果状态取值：
+
+| 状态 | 含义 |
+|---|---|
+| `succeeded` | 执行成功 |
+| `failed` | 执行失败（错误同步返回） |
+| `skipped` | 未执行（规划中技术跳过） |
+
+### 示例输出
+
+```
+succeeded BB05.001: 目录枚举完成，未发现命中（匹配状态码 200/301/302/403）
+```
+
+## 配置指南
+
+### 配置文件（`configs/redteam.json`）
+
+```json
+{
+  "tools": {
+    "ffuf": "ffuf",
+    "nmap": "nmap",
+    "nuclei": "nuclei",
+    "httpx": "httpx",
+    "subfinder": "subfinder",
+    "sqlmap": "sqlmap"
+  },
+  "wordlists": {
+    "common": "configs/wordlists/common.txt"
+  },
+  "notifications": {
+    "platform": "none",
+    "local": true
+  }
+}
+```
+
+| 段 | 字段 | 说明 |
+|---|---|---|
+| `tools` | 工具名 → 命令名/绝对路径 | 命令名经 PATH 解析；绝对路径直接使用 |
+| `wordlists` | 字典名 → 文件路径 | 技术按名称引用，禁止硬编码路径 |
+| `notifications` | `platform` | `telegram` / `wechat` / `none`（默认不发送通知） |
+| `notifications` | `local` | 本地系统通知开关，缺省视为开启 |
+
+### 环境变量（`.env`）
+
+`.env` 存放通知凭据与 AI 供应商 API Key，已被 `.gitignore` 忽略，不进版本仓库。复制 `.env.example` 为 `.env` 并填写实际值。
+
+| 变量 | 用途 |
+|---|---|
+| `NOTIFICATION_PLATFORM` | 通知平台：`telegram` / `wechat` / `none` |
+| `TELEGRAM_BOT_TOKEN` | Telegram Bot Token（platform=telegram 时必填） |
+| `TELEGRAM_CHAT_ID` | Telegram 目标会话 ID |
+| `OPENCLAW_GATEWAY_URL` | OpenClaw gateway 地址（默认 `http://localhost:18789`） |
+| `OPENCLAW_GATEWAY_TOKEN` | gateway 认证令牌（本机回环可留空） |
+| `OPENCLAW_WECHAT_CHANNEL` | 微信渠道名（默认 `openclaw-weixin`） |
+| `OPENCLAW_WECHAT_TO` | 接收方标识（由 OpenClaw 侧定义） |
+| `OPENAI_API_KEY` / `OPENAI_MODEL` | OpenAI 凭据与模型 |
+| `DEEPSEEK_API_KEY` / `DEEPSEEK_MODEL` | DeepSeek 凭据与模型 |
+| `MOONSHOT_API_KEY` / `MOONSHOT_MODEL` | Kimi 凭据与模型 |
+| `ARK_API_KEY` / `ARK_MODEL` | 豆包（火山方舟）凭据与模型 |
+| `OPENROUTER_API_KEY` / `OPENROUTER_MODEL` | OpenRouter 凭据与模型 |
+| `ANTHROPIC_API_KEY` / `ANTHROPIC_MODEL` | Anthropic 凭据与模型 |
+
+### 分环境配置建议
+
+| 场景 | 配置要点 |
+|---|---|
+| 本地开发 | 使用默认 `configs/redteam.json`，`platform=none`，工具经 PATH 解析 |
+| CI / 自动化 | 非交互环境自动跳过字典询问；配置绝对工具路径避免 PATH 差异 |
+| 生产 / 红队任务 | 明确 `platform=telegram` 或 `wechat`，`local=true`，`.env` 注入凭据 |
 
 ## AI 辅助执行
 
-通过 `--ai` 启用 AI 辅助模式：程序执行用户请求的初始技术，把执行输出交给 LLM 分析，并由 LLM 从目录中选择并自动推进建议的下一步技术（最多 3 轮）。至少配置一家供应商的 API Key 后才能启用；未配置任何供应商时 `--ai` 会明确报错，不会静默失败。
+通过 `--ai` 启用 AI 辅助模式：程序执行用户请求的初始技术，把执行输出交给 LLM 分析，并由 LLM 从目录中选择并自动推进建议的下一步技术（最多 **3 轮**）。至少配置一家供应商的 API Key 后才能启用；未配置任何供应商时 `--ai` 会明确报错，不会静默失败。
 
-| 供应商 | 环境变量 | 默认模型 |
-|---|---|---|
-| OpenAI | `OPENAI_API_KEY` | `gpt-4o-mini` |
-| DeepSeek | `DEEPSEEK_API_KEY` | `deepseek-v4-flash` |
-| Kimi（Moonshot） | `MOONSHOT_API_KEY` | `kimi-k3` |
-| 豆包（火山方舟） | `ARK_API_KEY` | `doubao-seed-2-1-pro-260628` |
-| OpenRouter | `OPENROUTER_API_KEY` | 任意模型 slug |
-| Anthropic | `ANTHROPIC_API_KEY` | `claude-sonnet-4-5` |
+| 供应商 | 凭据变量 | 模型变量 | 默认模型 |
+|---|---|---|---|
+| OpenAI | `OPENAI_API_KEY` | `OPENAI_MODEL` | `gpt-4o-mini` |
+| DeepSeek | `DEEPSEEK_API_KEY` | `DEEPSEEK_MODEL` | `deepseek-v4-flash` |
+| Kimi（Moonshot） | `MOONSHOT_API_KEY` | `MOONSHOT_MODEL` | `kimi-k3` |
+| 豆包（火山方舟） | `ARK_API_KEY` | `ARK_MODEL` | `doubao-seed-2-1-pro-260628` |
+| OpenRouter | `OPENROUTER_API_KEY` | `OPENROUTER_MODEL` | 任意模型 slug |
+| Anthropic | `ANTHROPIC_API_KEY` | `ANTHROPIC_MODEL` | Claude 系列 |
+
+行为约定：
+
+- 供应商随机选择：从环境变量中**已配置凭据**的供应商里随机选一家。
+- 决策约束：LLM 只能从目录中的技术里选择下一步，必须输出指定 JSON 结构。
+- 终止条件：达到 3 轮上限、LLM 建议为空、建议无效或执行失败即停止。
 
 ## 通知系统
 
-执行结果可通过三条通道送达，配置见 `configs/redteam.json` 的 `notifications` 段与 `.env`：
+执行结果可通过三条通道送达：
 
 | 通道 | 配置 | 说明 |
 |---|---|---|
@@ -211,218 +393,129 @@ MITRERedTeam 采用**目录驱动的注册式插件架构**（Catalog-Driven Reg
 | SECURITY | 安全 | 安全相关事件 |
 | FATAL | 致命 | 致命错误并退出 |
 
-## 项目结构
+## 目录数据结构
 
-```
-MITRERedTeam/
-├── .githooks/
-│   └── pre-commit              # 提交前质量门禁：gofmt → build → test → golangci-lint
-├── catalog/
-│   ├── tactics.json            # 战术目录数据：25 个战术（BB01–BB25）
-│   └── techniques.json         # 技术目录数据：27 条技术，含 executor/mode/tools/mitre
-├── cmd/
-│   └── mitre_red_team/
-│       └── main.go             # CLI 主程序入口
-├── configs/
-│   ├── wordlists/
-│   │   └── common.txt          # 默认目录枚举字典
-│   └── redteam.json            # 运行配置：工具路径、字典、通知偏好
-├── docs/
-│   └── mitre-mapping.md        # MITRE 编号映射说明
-├── internal/
-│   ├── agent/                  # AI 辅助执行：决策提示与多轮循环
-│   ├── app/                    # 应用装配层
-│   ├── catalog/                # 目录加载、校验、ID 索引注册表
-│   ├── config/                 # 配置加载与工具可用性检查
-│   ├── engine/                 # 执行编排：技术/战术/MITRE 调度
-│   ├── llm/                    # 六家 LLM 供应商客户端
-│   ├── model/                  # 数据契约：Tactic/Technique/Target/Execution
-│   ├── technique/              # 执行器注册表与领域实现（enumeration 等）
-│   └── utilities/              # 日志、通知、dotenv、内存监控
-├── test/                       # 全部 Go 测试（外部测试包）
-├── tools/                      # 外部工具适配层
-│   ├── interface.go            # Result / Runner 统一执行器
-│   ├── adapter.go              # Adapter 公共基座、默认超时
-│   ├── ffuf/ nmap/ nuclei/     # 各工具适配器
-│   ├── httpx/ subfinder/ sqlmap/
-│   └── README.md               # 适配层文档与新增适配器指南
-├── Makefile                    # 常用开发命令
-└── go.mod                      # module mitre_red_team / go 1.26.1 / 零第三方依赖
-```
-
-## 编译与运行
-
-### 前置条件
-
-- Go 1.26 或更高版本
-- 按需安装外部工具（ffuf、nmap、nuclei、httpx、subfinder、sqlmap），未安装时程序会提示缺失工具与安装指引
-
-### 安装依赖
-
-**macOS (Homebrew):**
-
-```
-brew install go ffuf nmap sqlmap
-go install github.com/projectdiscovery/nuclei/v3/cmd/nuclei@latest
-go install github.com/projectdiscovery/httpx/cmd/httpx@latest
-go install github.com/projectdiscovery/subfinder/v2/cmd/subfinder@latest
-```
-
-**Ubuntu / Debian:**
-
-```
-sudo apt-get install golang ffuf nmap sqlmap
-go install github.com/projectdiscovery/nuclei/v3/cmd/nuclei@latest
-go install github.com/projectdiscovery/httpx/cmd/httpx@latest
-go install github.com/projectdiscovery/subfinder/v2/cmd/subfinder@latest
-```
-
-### 方式一：直接运行
-
-```
-# 目录枚举
-go run ./cmd/mitre_red_team --url https://example.com --technique BB05.001
-
-# 执行整个战术
-go run ./cmd/mitre_red_team --url https://example.com --tactic BB05
-
-# 按 MITRE ID 执行
-go run ./cmd/mitre_red_team --url https://example.com --mitre T1046
-```
-
-### 方式二：Make 构建
-
-```
-# 编译可执行文件到 build/mitre_red_team
-make binary
-
-# 运行（参数通过 ARGS 传递）
-make run ARGS="--url https://example.com --technique BB05.001"
-
-# 完整质量门禁
-make all
-```
-
-## CLI 用法
-
-| 参数 | 说明 |
-|---|---|
-| `--url <target>` | 目标 URL，必填 |
-| `--technique <ID>` | 执行单条技术，如 `BB05.001` |
-| `--tactic <ID>` | 执行整个战术，如 `BB05` |
-| `--mitre <ID>` | 按 MITRE ATT&CK ID 执行，如 `T1046` |
-| `--wordlist / -w <path>` | 自定义字典文件路径 |
-| `--ai` | 启用 AI 辅助执行模式 |
-| `--config <path>` | 配置文件路径（默认 `configs/redteam.json`） |
-
-`--technique`、`--tactic`、`--mitre` 三选一；未指定任何选择器或未提供 `--url` 时会报错并打印完整用法。
-
-## 快速上手
-
-**目录枚举（BB05.001）：**
-
-```
-# 非交互环境（管道 / CI / IDE 内嵌）自动回退默认字典，不会阻塞等待输入
-go run ./cmd/mitre_red_team --url https://example.com --technique BB05.001
-
-# 使用自定义字典
-go run ./cmd/mitre_red_team --url https://example.com --technique BB05.001 -w /path/to/words.txt
-```
-
-**端口发现（BB02.005）：**
-
-端口发现执行器目前规划中。执行未实现的技术时引擎会明确提示，例如：
-
-```
-go run ./cmd/mitre_red_team --url https://example.com --mitre T1046
-# 输出：错误: 所选技术均未实现执行器，无法执行
-```
-
-**AI 辅助执行：**
-
-```
-# 复制 .env.example 为 .env 并填入至少一家 LLM 供应商的 API Key
-cp .env.example .env
-go run ./cmd/mitre_red_team --url https://example.com --technique BB05.001 --ai
-```
-
-## 运行输出
-
-```
-2026-08-17T02:17:33Z [信息] op=LoadDotenv desc=环境文件加载完成
-2026-08-17T02:17:33Z [信息] op=LoadConfig desc=已加载配置 configs/redteam.json，工具 6 项，字典 1 项
-2026-08-17T02:17:33Z [信息] op=LoadCatalog desc=目录校验通过：战术 25 条，技术 27 条
-2026-08-17T02:17:33Z [信息] op=ValidateFlags desc=命令行参数校验通过
-2026-08-17T02:17:33Z [信息] op=CheckTools desc=全部依赖工具可用
-2026-08-17T02:17:33Z [信息] op=ResolveWordlist desc=选定字典 configs/wordlists/common.txt
-2026-08-17T02:17:33Z [信息] op=ParseTarget desc=目标解析完成：主机 example.com，协议 https，端口 0
-2026-08-17T02:17:33Z [信息] op=Execute desc=按技术 BB05.001 执行
-succeeded BB05.001: 目录枚举完成，未发现命中（匹配状态码 200/301/302/403）
-2026-08-17T02:17:35Z [信息] op=Summary desc=按技术执行完成：1/1 项成功
-```
-
-## 配置说明
-
-`configs/redteam.json` 声明工具路径、字典与通知偏好：
+### tactics.json
 
 ```json
 {
-  "tools": {
-    "ffuf": "ffuf",
-    "nmap": "nmap",
-    "nuclei": "nuclei",
-    "httpx": "httpx",
-    "subfinder": "subfinder",
-    "sqlmap": "sqlmap"
-  },
-  "wordlists": {
-    "common": "configs/wordlists/common.txt"
-  },
-  "notifications": {
-    "platform": "none",
-    "local": true
-  }
+  "id": "BB05",
+  "name": "Web 应用枚举",
+  "description": "发现 Web 应用的路由、资源、参数和接口。",
+  "techniques": ["BB05.001", "BB05.003"]
 }
 ```
 
-| 段 | 说明 |
-|---|---|
-| `tools` | 工具名到可执行文件的映射，命令名经 PATH 解析，绝对路径直接使用 |
-| `wordlists` | 字典名到文件路径的映射，技术按名称引用，禁止硬编码路径 |
-| `notifications` | `platform`（telegram / wechat / none）与本地通知开关 `local` |
+| 字段 | 类型 | 说明 |
+|---|---|---|
+| `id` | string | 战术编号（`BBxx`），主键 |
+| `name` | string | 战术名称，中文 |
+| `description` | string | 战术描述，中文 |
+| `techniques` | array[string] | 该战术下的技术 ID 列表 |
 
-环境变量（`.env`）用于通知平台凭据与 AI 供应商 API Key，敏感信息不进版本仓库。启动时 `.env` 文件不存在或条目为空会被静默忽略。
+### techniques.json
+
+```json
+{
+  "id": "BB05.001",
+  "name": "目录枚举",
+  "tactic_id": "BB05",
+  "description": "识别授权 Web 目标中可访问的目录和资源。",
+  "executor": "directory-enumeration",
+  "mode": "active",
+  "tools": ["ffuf"],
+  "mitre": ["T1083"],
+  "tags": ["web", "directory", "fuzzing"]
+}
+```
+
+| 字段 | 类型 | 说明 |
+|---|---|---|
+| `id` | string | 技术编号（`BBxx.xxx`），主键 |
+| `name` | string | 技术名称，中文 |
+| `tactic_id` | string | 所属战术编号 |
+| `description` | string | 技术描述，中文 |
+| `executor` | string | 执行器标识，映射到 `internal/technique/` 实现 |
+| `mode` | string | 执行模式：`passive` / `active` / `manual` |
+| `tools` | array[string] | 依赖的外部工具名 |
+| `mitre` | array[string] | MITRE ATT&CK ID，仅元数据 |
+| `tags` | array[string] | 分类标签 |
+
+### 校验规则
+
+启动时 `catalog.Validate` 强制执行：
+
+1. 战术 ID 唯一。
+2. 技术 ID 唯一。
+3. 执行模式属于 `passive` / `active` / `manual`。
+4. 技术引用的战术存在（引用完整性）。
+5. 战术声明的技术引用允许尚未实现（规划与实现分离，查询时只返回已实现项）。
 
 ## 扩展指南
 
-**新增一条技术：**
+### 新增一条技术
 
 1. 在 `catalog/techniques.json` 添加条目，声明 `executor`、`mode`、`tools` 与 `mitre` 映射。
-2. 在 `internal/technique/` 对应领域子目录实现执行器，经注册表注册。
+2. 在 `internal/technique/` 对应领域子目录实现执行器，经 `technique.Register(executor, impl)` 注册。
 3. 技术实现不得直接执行 `exec.Command`，统一经 `tools/` 适配层调用外部工具。
+4. 补充参数构造测试（`test/tools_test.go` 用 `/bin/echo` 作假命令）与行为测试。
 
-**新增一个工具适配器：** 按 `tools/README.md` 中的五步指南接入：新建 `tools/<name>/`、嵌入 `tools.Adapter` 公共基座、实现业务方法、声明配置、补测试。
+### 新增一个工具适配器
 
-**提交前质量门禁：** `.githooks/pre-commit` 强制 `gofmt -l` 为空、`go build ./...` 无错误、`go test ./...` 全部通过、`golangci-lint` 无错误。
+按 `tools/README.md` 五步指南：新建 `tools/<name>/`、嵌入 `tools.Adapter` 公共基座、实现业务方法、在 `configs/redteam.json` 声明配置、补测试并更新适配器清单。
 
-## 安全最佳实践
+### 新增/调整 MITRE 映射
 
-- 仅在**授权范围**内使用，执行必须由用户显式选择，不自动扩大目标。
-- 外部命令一律 `exec.CommandContext`，参数以切片传递，不做 shell 解释；禁止 `sh -c` 拼接。
-- 所有外部调用带 context 超时；工具输出按行数上限约束，防止异常输出拖垮本地资源。
-- 外部输入（CLI 参数、配置、工具输出）先校验长度与格式再进入业务逻辑。
-- 凭据与 API Key 只存内存，不回显、不落盘、不写日志。
-- 非交互环境（管道 / CI / IDE 内嵌）自动跳过交互询问，避免无声阻塞。
+只需修改 `catalog/techniques.json` 的 `mitre` 字段，随后运行校验确认数据一致：
 
-## 技术实现细节
+```bash
+go test ./test/ -run TestTechniquesByMitreID -v
+```
 
-- **CDRPA 架构**：目录驱动 + 注册模式 + 插件架构 + 分层 + 依赖倒置，核心引擎不依赖具体工具与技术实现。
-- **索引化查询**：目录加载阶段建立 ID 索引，`GetTactic` / `GetTechnique` 为 O(1) 查表，替代线性扫描。
-- **工具适配基座**：`tools.Adapter` 公共基座统一执行器与默认超时兜底，ffuf 参数经 `FuzzOptions` 集中构造。
-- **流式加载**：catalog JSON 用 `json.Decoder` 流式消费，内存占用与单条记录成正比，不整文件常驻。
-- **非交互检测**：`promptEnabled` 检测 stdin 是否为终端字符设备，非交互环境跳过询问直接回退默认字典。
-- **内存约束**：RSS 上限 500MB，`GOMEMLIMIT=480MiB` 软限制，监控协程定期采样 `runtime.ReadMemStats`，连续超限即退出。
-- **确定性执行**：技术按目录声明顺序执行，结果结构化输出，失败不静默。
+### 提交前质量门禁
+
+`.githooks/pre-commit` 强制：
+
+1. `gofmt -l` 输出为空。
+2. `go build ./...` 无错误。
+3. `go test ./...` 全部通过。
+4. `golangci-lint run` 无错误（已安装时）。
+
+## 故障排查
+
+| 现象 | 可能原因 | 解决方式 |
+|---|---|---|
+| 程序在非交互环境卡在输入提示 | stdin 非终端，交互询问永不返回 | 该场景已内置检测：非交互环境自动跳过询问并回退默认字典。确认使用最新代码；仍出现请用 `--wordlist` 显式指定字典 |
+| 报错「缺少以下必需工具」 | 外部工具未安装或不在 PATH | 按提示安装对应工具（`brew install ffuf` 等），或把 `configs/redteam.json` 中工具路径改为绝对路径 |
+| 报错「字典文件不存在 / 没有有效条目」 | 字典路径错误或文件为空 | 检查字典路径；字典须为 UTF-8，每行一条，空行与 `#` 开头行被忽略 |
+| `--ai` 报「LLM 供应商 … 缺少配置」 | 未设置对应 API Key 环境变量 | 在 `.env` 配置至少一家供应商的凭据；模型变量缺失时回退到默认模型，两者皆空才报错 |
+| 报「所选技术均未实现执行器」 | 选择的技术只有目录元数据，无 Go 实现 | 该技术处于规划阶段。用 `--technique BB05.001` 等已实现技术，或按「扩展指南」实现执行器 |
+| 报「目录校验失败」 | catalog JSON 存在重复 ID、非法模式或悬空引用 | 按错误信息定位并修正 `catalog/*.json`；运行 `go test ./test/` 验证 |
+| 工具执行返回非零退出码 | 目标不可达、参数不合法等 | stderr 会透传工具原因；检查目标可达性与工具版本 |
+| ffuf 扫描无命中 | 目标路径确实不存在，或匹配码不符 | 默认匹配 200/301/302/403；可通过 `FuzzOptions.MatchCodes` 调整 |
+| 中文显示乱码 | 终端编码非 UTF-8 | 确认终端使用 UTF-8 编码 |
+
+## 版本历史
+
+| 提交 | 变更内容 |
+|---|---|
+| `87358b8` | 新增完整项目开发文档站点（docs/index.html + PlantUML 图表） |
+| `dfd82a6` | 工具适配层重构：公共基座、ffuf 选项与文档化接入指南 |
+| `4cb8f83` | 修复非交互环境下的无声挂起并补全执行日志 |
+| `1cf0652` | 补充代码规范文档并统一多行签名排版 |
+| `b560340` | 目录查询索引化与构建产物管理完善 |
+| `c585300` | 移除独立的 agent 命令入口 |
+| `2f9364f` | 新增 AI 辅助执行模式与六家 LLM 供应商客户端 |
+| `a55499d` | 修复目录枚举真实站点执行并建立可配置字典体系 |
+| `51aa97b` | 配置模块与相关规范完善 |
+| `578b64c` | 实现红队评估 CLI 的完整执行链路、工具适配层与通知系统 |
+| `ef5fd75` | 新增执行请求、执行计划与结果相关模型 |
+| `a06e866` | 新增 utilities 包下的结构化日志器实现与配套测试 |
+| `a0619c3` | 删除重写架构文档的计划草稿 |
+| `8fb8780` | 初始化项目规范与配置文件 |
+| `b71837d` | 新增漏洞赏金战术与技术模型及官方目录 |
+| `93d1b29` | 新增 README.md 文件 |
+| `65ed6fc` | 初始化项目基础结构和 pre-commit 钩子 |
 
 ## 依赖项
 
@@ -431,7 +524,31 @@ succeeded BB05.001: 目录枚举完成，未发现命中（匹配状态码 200/3
 | 运行时 | Go 1.26.1，零第三方 Go 依赖（仅标准库） |
 | 外部工具 | ffuf、nmap、nuclei、httpx、subfinder、sqlmap（按需安装） |
 | AI 辅助 | 六家 LLM 供应商 API（OpenAI / DeepSeek / Kimi / 豆包 / OpenRouter / Anthropic，`--ai` 模式） |
+| 文档生成 | PlantUML（`docs/assets/*.puml` → PNG） |
 
 ## 许可证
 
 本项目采用 [GPLv3](https://www.gnu.org/licenses/gpl-3.0.html) 许可证，作者：钟智强。
+
+
+---
+
+<div align="center">
+
+<h2>支持</h2>
+
+<p>如果您觉得本项目对您有帮助，欢迎请我喝杯咖啡</p>
+<p><sub>您的支持是我持续维护和改进的动力</sub></p>
+
+<br/>
+
+<strong>微信扫码捐赠</strong><br/><br/>
+<img src="https://raw.gitcode.com/ctkqiang_sr/ctkqiang_sr/raw/main/mm_reward_qrcode_1778988737577.png"
+     alt="微信扫码捐赠"
+     width="240"
+     style="border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.15);" />
+
+<br/>
+<br/>
+
+---

@@ -1,0 +1,187 @@
+# =============================================================================
+# MITRERedTeam 跨平台编译工作流
+# 支持 macOS、Ubuntu、Windows 三平台自动编译、测试与产物归档
+# =============================================================================
+name: 跨平台编译
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+    branches: [main, master]
+  workflow_dispatch:
+
+jobs:
+  # ===========================================================================
+  # macOS 编译
+  # ===========================================================================
+  compile-macos:
+    name: 编译 - macOS
+    runs-on: macos-latest
+    steps:
+      - name: 检出代码
+        uses: actions/checkout@v4
+
+      - name: 安装 Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: "1.26"
+
+      - name: 代码质量检查
+        run: |
+          echo "::group::检查代码格式"
+          test -z "$(gofmt -l .)" || { gofmt -l .; echo "::error::存在未格式化文件"; exit 1; }
+          echo "::endgroup::"
+
+      - name: 静态分析
+        run: go vet ./...
+
+      - name: 编译
+        run: |
+          go build ./...
+          go build -o build/mitre_red_team ./cmd/mitre_red_team
+
+      - name: 运行测试
+        run: go test ./...
+
+      - name: 验证构建产物
+        run: |
+          echo "::group::构建产物检查"
+          ls -la build/
+          file build/mitre_red_team
+          echo "::endgroup::"
+
+      - name: 上传构建产物
+        uses: actions/upload-artifact@v4
+        with:
+          name: mitre_red_team-macos
+          path: build/mitre_red_team
+          retention-days: 30
+
+  # ===========================================================================
+  # Ubuntu 编译
+  # ===========================================================================
+  compile-ubuntu:
+    name: 编译 - Ubuntu
+    runs-on: ubuntu-latest
+    steps:
+      - name: 检出代码
+        uses: actions/checkout@v4
+
+      - name: 安装 Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: "1.26"
+
+      - name: 代码质量检查
+        run: |
+          echo "::group::检查代码格式"
+          test -z "$(gofmt -l .)" || { gofmt -l .; echo "::error::存在未格式化文件"; exit 1; }
+          echo "::endgroup::"
+
+      - name: 静态分析
+        run: go vet ./...
+
+      - name: 编译
+        run: |
+          go build ./...
+          go build -o build/mitre_red_team ./cmd/mitre_red_team
+
+      - name: 运行测试
+        run: go test ./...
+
+      - name: 验证构建产物
+        run: |
+          echo "::group::构建产物检查"
+          ls -la build/
+          file build/mitre_red_team
+          echo "::endgroup::"
+
+      - name: 上传构建产物
+        uses: actions/upload-artifact@v4
+        with:
+          name: mitre_red_team-ubuntu
+          path: build/mitre_red_team
+          retention-days: 30
+
+  # ===========================================================================
+  # Windows 编译
+  # ===========================================================================
+  compile-windows:
+    name: 编译 - Windows
+    runs-on: windows-latest
+    steps:
+      - name: 检出代码
+        uses: actions/checkout@v4
+
+      - name: 安装 Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: "1.26"
+
+      - name: 代码质量检查
+        shell: pwsh
+        run: |
+          $unformatted = & gofmt -l .
+          if ($unformatted) {
+            Write-Host "::error::存在未格式化文件"
+            Write-Host $unformatted
+            exit 1
+          }
+
+      - name: 静态分析
+        run: go vet ./...
+
+      - name: 编译
+        shell: pwsh
+        run: |
+          go build ./...
+          New-Item -ItemType Directory -Force -Path build | Out-Null
+          go build -o build\mitre_red_team.exe ./cmd/mitre_red_team
+
+      - name: 运行测试
+        run: go test ./...
+
+      - name: 验证构建产物
+        shell: pwsh
+        run: |
+          Write-Host "::group::构建产物检查"
+          Get-ChildItem -Path build -Include "*.exe" -Recurse | ForEach-Object {
+            Write-Host "[产物] $($_.FullName) ($([math]::Round($_.Length / 1KB, 1)) KB)"
+          }
+          Write-Host "::endgroup::"
+
+      - name: 上传构建产物
+        uses: actions/upload-artifact@v4
+        with:
+          name: mitre_red_team-windows
+          path: build/mitre_red_team.exe
+          retention-days: 30
+
+  # ===========================================================================
+  # 构建状态汇总
+  # ===========================================================================
+  build-summary:
+    name: 构建汇总
+    runs-on: ubuntu-latest
+    needs: [compile-macos, compile-ubuntu, compile-windows]
+    if: always()
+    steps:
+      - name: 检查构建结果
+        run: |
+          echo "========================================="
+          echo " MITRERedTeam 跨平台构建结果"
+          echo "========================================="
+          echo ""
+          echo " macOS: ${{ needs.compile-macos.result }}"
+          echo " Ubuntu: ${{ needs.compile-ubuntu.result }}"
+          echo " Windows: ${{ needs.compile-windows.result }}"
+          echo ""
+          echo "========================================="
+          if [ "${{ needs.compile-macos.result }}" = "failure" ] || \
+             [ "${{ needs.compile-ubuntu.result }}" = "failure" ] || \
+             [ "${{ needs.compile-windows.result }}" = "failure" ]; then
+            echo "::error::一个或多个平台编译失败"
+            exit 1
+          fi
+          echo "所有平台编译成功"

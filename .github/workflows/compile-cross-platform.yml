@@ -103,32 +103,14 @@ jobs:
             os: macos-latest
             artifact: mitre_red_team-darwin
             binary: mitre_red_team
-            shell: bash
-            verify: |
-              ls -la build/
-              file build/mitre_red_team
           - platform: Ubuntu
             os: ubuntu-latest
             artifact: mitre_red_team-linux
             binary: mitre_red_team
-            shell: bash
-            verify: |
-              ls -la build/
-              file build/mitre_red_team
           - platform: Windows
             os: windows-latest
             artifact: mitre_red_team-windows
             binary: mitre_red_team.exe
-            shell: pwsh
-            verify: |
-              $binaries = Get-ChildItem -Path build -Include "*.exe" -Recurse
-              if ($binaries.Count -eq 0) {
-                Write-Host "::error::未找到编译产物 (.exe)"
-                exit 1
-              }
-              foreach ($bin in $binaries) {
-                Write-Host "[产物] $($bin.FullName) ($([math]::Round($bin.Length / 1KB, 1)) KB)"
-              }
     steps:
       - name: 检出代码
         uses: actions/checkout@v4
@@ -157,9 +139,13 @@ jobs:
         shell: bash
         run: go test ./...
 
+      # 三个平台统一走 bash（Windows runner 自带 Git Bash），ls 与 test 均可用。
       - name: 验证构建产物
-        shell: ${{ matrix.shell }}
-        run: ${{ matrix.verify }}
+        shell: bash
+        run: |
+          ls -la build/
+          test -f "build/${{ matrix.binary }}" || { echo "::error::构建产物缺失"; exit 1; }
+          echo "构建产物 ${{ matrix.binary }} 存在且完整"
 
       - name: 上传构建产物
         uses: actions/upload-artifact@v4

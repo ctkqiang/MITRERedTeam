@@ -1,8 +1,21 @@
 # =============================================================================
-# MITRERedTeam 跨平台编译工作流
-# 支持 macOS、Ubuntu、Windows 三平台自动编译、测试与产物归档
+# MITRERedTeam 跨平台持续集成工作流
+#
+# 覆盖能力：
+#   1. Lint    - gofmt 格式检查 / go vet 静态分析 / golangci-lint 代码检查
+#   2. Test    - go test -race ./... 全量测试 + 竞态检测
+#   3. Compile - macOS / Ubuntu / Windows 三平台编译、测试与产物归档
+#   4. Summary - 汇总各 Job 结果，任一失败即标记整体失败
+#
+# 设计说明：
+#   - 编译 Job 使用矩阵（matrix）消除三份重复步骤，新增平台只需扩展 include
+#   - 统一禁用 core.autocrlf，配合仓库 .gitattributes 保证 LF 检出，
+#     避免 Windows 上 gofmt 误报"全部未格式化"
+#   - fail-fast: false 让单个平台失败不中断其余平台验证
+#   - setup-go 显式 cache: false：GitCode 与 GitHub 需保持一致且均可运行，
+#     不依赖各自平台的缓存服务差异
 # =============================================================================
-name: 跨平台编译
+name: 跨平台持续集成
 
 on:
   push:
@@ -11,187 +24,160 @@ on:
     branches: [main, master]
   workflow_dispatch:
 
+# 最小权限：CI 只需读取仓库内容，不授予任何写权限
+permissions:
+  contents: read
+
+# 同一分支并发触发时取消旧运行，节省资源
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   # ===========================================================================
-  # macOS 编译
+  # Lint：格式与静态检查（单平台即可，与目标平台无关）
   # ===========================================================================
-  compile-macos:
-    name: 编译 - macOS
-    runs-on: macos-latest
-    steps:
-      - name: 检出代码
-        uses: actions/checkout@v4
-
-      - name: 禁用 CRLF 自动转换
-        run: git config --global core.autocrlf false
-
-      - name: 安装 Go
-        uses: actions/setup-go@v5
-        with:
-          go-version: "1.26"
-
-      - name: 代码质量检查
-        run: |
-          echo "::group::检查代码格式"
-          test -z "$(gofmt -l .)" || { gofmt -l .; echo "::error::存在未格式化文件"; exit 1; }
-          echo "::endgroup::"
-
-      - name: 静态分析
-        run: go vet ./...
-
-      - name: 编译
-        run: |
-          go build ./...
-          go build -o build/mitre_red_team ./cmd/mitre_red_team
-
-      - name: 运行测试
-        run: go test ./...
-
-      - name: 验证构建产物
-        run: |
-          echo "::group::构建产物检查"
-          ls -la build/
-          file build/mitre_red_team
-          echo "::endgroup::"
-
-      - name: 上传构建产物
-        uses: actions/upload-artifact@v4
-        with:
-          name: mitre_red_team-macos
-          path: build/mitre_red_team
-          retention-days: 30
-
-  # ===========================================================================
-  # Ubuntu 编译
-  # ===========================================================================
-  compile-ubuntu:
-    name: 编译 - Ubuntu
+  lint:
+    name: Lint（gofmt + vet + golangci-lint）
     runs-on: ubuntu-latest
     steps:
       - name: 检出代码
         uses: actions/checkout@v4
 
-      - name: 禁用 CRLF 自动转换
-        run: git config --global core.autocrlf false
-
       - name: 安装 Go
         uses: actions/setup-go@v5
         with:
           go-version: "1.26"
+          cache: false
 
-      - name: 代码质量检查
+      - name: 检查代码格式（gofmt -l 必须为空）
         run: |
-          echo "::group::检查代码格式"
-          test -z "$(gofmt -l .)" || { gofmt -l .; echo "::error::存在未格式化文件"; exit 1; }
-          echo "::endgroup::"
-
-      - name: 静态分析
-        run: go vet ./...
-
-      - name: 编译
-        run: |
-          go build ./...
-          go build -o build/mitre_red_team ./cmd/mitre_red_team
-
-      - name: 运行测试
-        run: go test ./...
-
-      - name: 验证构建产物
-        run: |
-          echo "::group::构建产物检查"
-          ls -la build/
-          file build/mitre_red_team
-          echo "::endgroup::"
-
-      - name: 上传构建产物
-        uses: actions/upload-artifact@v4
-        with:
-          name: mitre_red_team-ubuntu
-          path: build/mitre_red_team
-          retention-days: 30
-
-  # ===========================================================================
-  # Windows 编译
-  # ===========================================================================
-  compile-windows:
-    name: 编译 - Windows
-    runs-on: windows-latest
-    steps:
-      - name: 检出代码
-        uses: actions/checkout@v4
-
-      - name: 禁用 CRLF 自动转换
-        shell: pwsh
-        run: git config --global core.autocrlf false
-
-      - name: 安装 Go
-        uses: actions/setup-go@v5
-        with:
-          go-version: "1.26"
-
-      - name: 代码质量检查
-        shell: pwsh
-        run: |
-          $unformatted = & gofmt -l .
-          if ($unformatted) {
-            Write-Host "::error::存在未格式化文件"
-            Write-Host $unformatted
-            exit 1
-          }
-
-      - name: 静态分析
-        run: go vet ./...
-
-      - name: 编译
-        shell: pwsh
-        run: |
-          go build ./...
-          New-Item -ItemType Directory -Force -Path build | Out-Null
-          go build -o build\mitre_red_team.exe ./cmd/mitre_red_team
-
-      - name: 运行测试
-        run: go test ./...
-
-      - name: 验证构建产物
-        shell: pwsh
-        run: |
-          Write-Host "::group::构建产物检查"
-          Get-ChildItem -Path build -Include "*.exe" -Recurse | ForEach-Object {
-            Write-Host "[产物] $($_.FullName) ($([math]::Round($_.Length / 1KB, 1)) KB)"
-          }
-          Write-Host "::endgroup::"
-
-      - name: 上传构建产物
-        uses: actions/upload-artifact@v4
-        with:
-          name: mitre_red_team-windows
-          path: build/mitre_red_team.exe
-          retention-days: 30
-
-  # ===========================================================================
-  # 构建状态汇总
-  # ===========================================================================
-  build-summary:
-    name: 构建汇总
-    runs-on: ubuntu-latest
-    needs: [compile-macos, compile-ubuntu, compile-windows]
-    if: always()
-    steps:
-      - name: 检查构建结果
-        run: |
-          echo "========================================="
-          echo " MITRERedTeam 跨平台构建结果"
-          echo "========================================="
-          echo ""
-          echo " macOS: ${{ needs.compile-macos.result }}"
-          echo " Ubuntu: ${{ needs.compile-ubuntu.result }}"
-          echo " Windows: ${{ needs.compile-windows.result }}"
-          echo ""
-          echo "========================================="
-          if [ "${{ needs.compile-macos.result }}" = "failure" ] || \
-             [ "${{ needs.compile-ubuntu.result }}" = "failure" ] || \
-             [ "${{ needs.compile-windows.result }}" = "failure" ]; then
-            echo "::error::一个或多个平台编译失败"
+          unformatted=$(gofmt -l .)
+          if [ -n "$unformatted" ]; then
+            echo "::error::以下文件未通过 gofmt 检查："
+            echo "$unformatted"
             exit 1
           fi
-          echo "所有平台编译成功"
+          echo "gofmt 检查通过"
+
+      - name: 静态分析（go vet）
+        run: go vet ./...
+
+      - name: 代码检查（golangci-lint）
+        run: |
+          go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest
+          golangci-lint run ./...
+
+  # ===========================================================================
+  # Test：全量测试 + 竞态检测
+  # ===========================================================================
+  test:
+    name: Test（go test -race）
+    runs-on: ubuntu-latest
+    needs: [lint]
+    steps:
+      - name: 检出代码
+        uses: actions/checkout@v4
+
+      - name: 安装 Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: "1.26"
+          cache: false
+
+      - name: 运行全量测试（含竞态检测）
+        run: go test -race ./...
+
+  # ===========================================================================
+  # Compile：三平台编译矩阵
+  # ===========================================================================
+  compile:
+    name: 编译 - ${{ matrix.platform }}
+    needs: [lint]
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: macOS
+            os: macos-latest
+            artifact: mitre_red_team-darwin
+            binary: mitre_red_team
+          - platform: Ubuntu
+            os: ubuntu-latest
+            artifact: mitre_red_team-linux
+            binary: mitre_red_team
+          - platform: Windows
+            os: windows-latest
+            artifact: mitre_red_team-windows
+            binary: mitre_red_team.exe
+    steps:
+      - name: 检出代码
+        uses: actions/checkout@v4
+
+      - name: 禁用 CRLF 自动转换
+        shell: bash
+        run: git config --global core.autocrlf false
+
+      - name: 安装 Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: "1.26"
+          cache: false
+
+      - name: 编译全部包
+        shell: bash
+        run: go build ./...
+
+      - name: 编译 CLI 可执行文件
+        shell: bash
+        run: |
+          mkdir -p build
+          go build -o "build/${{ matrix.binary }}" ./cmd/mitre_red_team
+
+      - name: 运行测试
+        shell: bash
+        run: go test ./...
+
+      # 三个平台统一走 bash（Windows runner 自带 Git Bash），ls 与 test 均可用。
+      - name: 验证构建产物
+        shell: bash
+        run: |
+          ls -la build/
+          test -f "build/${{ matrix.binary }}" || { echo "::error::构建产物缺失"; exit 1; }
+          echo "构建产物 ${{ matrix.binary }} 存在且完整"
+
+      - name: 上传构建产物
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifact }}
+          path: build/${{ matrix.binary }}
+          retention-days: 30
+
+  # ===========================================================================
+  # Summary：汇总所有 Job 结果
+  # ===========================================================================
+  summary:
+    name: 构建汇总
+    runs-on: ubuntu-latest
+    needs: [lint, test, compile]
+    if: always()
+    steps:
+      - name: 检查 CI 结果
+        run: |
+          echo "========================================="
+          echo " MITRERedTeam 跨平台 CI 结果"
+          echo "========================================="
+          echo ""
+          echo " Lint:      ${{ needs.lint.result }}"
+          echo " Test:      ${{ needs.test.result }}"
+          echo " Compile:   ${{ needs.compile.result }}"
+          echo ""
+          echo "========================================="
+          if [ "${{ needs.lint.result }}" = "failure" ] || \
+             [ "${{ needs.test.result }}" = "failure" ] || \
+             [ "${{ needs.compile.result }}" = "failure" ]; then
+            echo "::error::一个或多个阶段失败，请检查上方日志"
+            exit 1
+          fi
+          echo "所有阶段均通过"

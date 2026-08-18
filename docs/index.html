@@ -351,13 +351,13 @@ go run ./cmd/mitre_red_team --url https://example.com --technique BB05.001 --ai`
 
               <SectionTitle id="architecture" title="系统架构" />
               <Paragraph>
-                MITRERedTeam 采用<Text strong>目录驱动的注册式插件架构</Text>
-                （Catalog-Driven Registry Plugin Architecture，CDRPA），组合五种模式：目录驱动、注册模式、插件架构、分层架构、依赖倒置。
+                这套架构叫<Text strong>CDRPA</Text>（目录驱动的注册式插件架构），拼了五种套路：目录驱动、注册模式、插件架构、
+                分层架构、依赖倒置。核心系统不碰具体工具和具体技术实现，只认抽象。加新技术、接新工具的时候，尽量不动核心执行引擎。
               </Paragraph>
               <Figure src="assets/flow.png" alt="MITRERedTeam 系统架构与数据流" puml="assets/flow.puml" />
 
               <SectionTitle id="sequence" title="执行时序" />
-              <Paragraph>下图展示一次目录枚举技术（BB05.001）从 CLI 触发到外部工具执行、结果回传的完整时序。</Paragraph>
+              <Paragraph>下面是一次目录枚举技术（BB05.001）从 CLI 触发到外部工具执行、结果回传的时序。</Paragraph>
               <Figure src="assets/sequence.png" alt="MITRERedTeam 技术执行时序" puml="assets/sequence.puml" />
 
               <SectionTitle id="tactics" title="支持的战术" />
@@ -366,24 +366,24 @@ go run ./cmd/mitre_red_team --url https://example.com --technique BB05.001 --ai`
               <SectionTitle id="techniques" title="支持的技术" />
               <Paragraph><Text code>catalog/techniques.json</Text> 当前收录 27 条技术。已实现状态指对应 Go 执行器是否已在 <Text code>internal/technique/</Text> 注册。</Paragraph>
               <Table columns={techniqueColumns} dataSource={techniqueData} pagination={false} size="middle" scroll={{ x: 760 }} />
-              <Paragraph type="secondary">执行规划中的技术时，引擎会跳过未注册的执行器并明确提示，不静默成功。</Paragraph>
+              <Paragraph type="secondary">执行到还没实现的技术时，引擎会跳过并把话说清楚，不会假装成功。</Paragraph>
 
               <SectionTitle id="tools" title="工具集成" />
-              <Paragraph>所有外部工具经 <Text code>tools/</Text> 适配层调用，统一处理路径解析、参数构造、context 超时、stdout/stderr 与退出码。</Paragraph>
+              <Paragraph>外部工具统一走 <Text code>tools/</Text> 适配层：路径解析、参数构造、context 超时、stdout/stderr 和退出码都在这一层处理。技术实现里不允许直接 <Text code>exec.Command</Text>。</Paragraph>
               <Table columns={toolColumns} dataSource={toolData} pagination={false} size="middle" />
 
               <SectionTitle id="modes" title="执行模式" />
               <Table columns={modeColumns} dataSource={modeData} pagination={false} size="middle" />
 
               <SectionTitle id="ai" title="AI 辅助执行" />
-              <Paragraph>通过 <Text code>--ai</Text> 启用 AI 辅助模式：程序执行用户请求的初始技术，把执行输出交给 LLM 分析，并由 LLM 从目录中选择并自动推进建议的下一步技术（最多 3 轮）。</Paragraph>
+              <Paragraph><Text code>--ai</Text> 打开 AI 辅助模式：先执行你指定的初始技术，把输出交给 LLM 分析，LLM 再从目录里挑一条建议的技术继续推进，最多跑 3 轮。前提是 <Text code>.env</Text> 里至少配了一家供应商的 API Key。</Paragraph>
               <Table columns={aiColumns} dataSource={aiData} pagination={false} size="middle" />
 
               <SectionTitle id="notify" title="通知系统" />
               <Table columns={notifyColumns} dataSource={notifyData} pagination={false} size="middle" />
 
               <SectionTitle id="logging" title="日志系统" />
-              <Paragraph>应用全程使用结构化日志器，每行日志包含 RFC3339 时间戳、级别、操作名与描述，输出到 stderr：</Paragraph>
+              <Paragraph>日志统一走结构化格式，一行里带上 RFC3339 时间戳、级别、操作名和描述，打到 stderr：</Paragraph>
               <CodeBlock code={logBlock} />
 
               <SectionTitle id="structure" title="项目结构" />

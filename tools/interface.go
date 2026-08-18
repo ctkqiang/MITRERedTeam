@@ -45,6 +45,11 @@ func (r *Runner) Run(ctx context.Context, arguments []string) (*Result, error) {
 	err := command.Run()
 	var exitCode int
 	if err != nil {
+		// 超时或取消时进程会被直接杀掉，Wait 返回的 *exec.ExitError 只是"进程被信号终止"，
+		// 不能当作工具的正常非零退出处理，否则超时错误会被吞掉、调用方误判为执行成功。
+		if ctx.Err() != nil {
+			return nil, fmt.Errorf("执行工具 %s 超时或取消: %w", r.executablePath, ctx.Err())
+		}
 		if exitError, ok := err.(*exec.ExitError); ok {
 			exitCode = exitError.ExitCode()
 		} else {

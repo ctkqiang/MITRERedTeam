@@ -58,9 +58,11 @@ jobs:
           CGO_ENABLED: "0"
         run: |
           binary="mitre_red_team-${{ matrix.name }}${{ matrix.ext }}"
+          mkdir -p dist
           go build -trimpath -ldflags "-s -w -X main.version=${{ github.ref_name }}" \
             -o "dist/$binary" ./cmd/mitre_red_team
-          sha256sum "dist/$binary" > "dist/$binary.sha256"
+          # 校验文件只写文件名，不写路径前缀，方便合并到统一目录后直接校验。
+          (cd dist && sha256sum "$binary" > "$binary.sha256")
 
       - name: 上传构建产物
         uses: actions/upload-artifact@v4
@@ -80,8 +82,14 @@ jobs:
       - name: 下载全部构建产物
         uses: actions/download-artifact@v4
         with:
-          path: dist
-          merge-multiple: true
+          path: artifacts
+
+      # 不同 artifact 会落在 artifacts/<name>/ 子目录里，先统一拉到扁平目录。
+      - name: 合并产物到统一目录
+        run: |
+          mkdir -p dist
+          find artifacts -type f \( -name "mitre_red_team-*" -o -name "*.sha256" \) -exec cp {} dist/ \;
+          ls -la dist/
 
       - name: 校验产物完整性
         run: |

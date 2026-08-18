@@ -1,0 +1,53 @@
+@startuml flow
+!theme plain
+skinparam backgroundColor #FFFFFF
+skinparam defaultFontName Helvetica
+skinparam componentStyle rectangle
+skinparam packageStyle rectangle
+title MITRERedTeam 系统架构与数据流
+
+package "CLI（cmd/mitre_red_team）" {
+    [命令行解析] as CLI
+}
+
+package "Engine（internal/engine）" {
+    [Planner] as Planner
+    [Engine] as Engine
+}
+
+package "Catalog（internal/catalog）" {
+    [目录加载] as CatalogLoader
+    [ID 索引注册表] as CatalogRegistry
+}
+
+package "Technique（internal/technique）" {
+    [Technique Registry] as TechRegistry
+    [领域技术实现] as DomainTech
+}
+
+package "Tool（tools/）" {
+    [Adapter 基座] as Adapter
+    [ffuf] as ffuf
+    [nmap] as nmap
+    [nuclei] as nuclei
+    [httpx] as httpx
+    [subfinder] as subfinder
+    [sqlmap] as sqlmap
+}
+
+CLI --> Planner : --technique / --tactic / --mitre / --url
+Planner --> Engine : Execution Plan
+Engine --> CatalogRegistry : 查询战术/技术
+CatalogLoader --> CatalogRegistry : 加载 catalog/*.json
+Engine --> TechRegistry : 按 executor 解析
+TechRegistry --> DomainTech : 注册映射
+DomainTech --> Adapter : 调用统一执行器
+Adapter --> ffuf
+Adapter --> nmap
+Adapter --> nuclei
+Adapter --> httpx
+Adapter --> subfinder
+Adapter --> sqlmap
+
+DomainTech ..> Engine : ExecutionResult
+@enduml

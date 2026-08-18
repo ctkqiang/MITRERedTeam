@@ -1,0 +1,31 @@
+@startuml sequence
+!theme plain
+skinparam backgroundColor #FFFFFF
+skinparam defaultFontName Helvetica
+title MITRERedTeam 技术执行时序
+
+actor "用户" as User
+participant "CLI" as CLI
+participant "Engine" as Engine
+participant "Catalog" as Catalog
+participant "Technique Registry" as Registry
+participant "领域技术" as Tech
+participant "Tool Adapter" as Adapter
+participant "外部工具" as Tool
+
+User -> CLI : go run --technique BB05.001 --url https://example.com
+CLI -> CLI : 加载配置与 catalog
+CLI -> Engine : Execute(ctx, request)
+Engine -> Catalog : GetTechnique("BB05.001")
+Catalog --> Engine : Technique{executor=directory-enumeration}
+Engine -> Registry : Get("directory-enumeration")
+Registry --> Engine : DirectoryEnumeration 实现
+Engine -> Tech : Execute(ctx, target)
+Tech -> Adapter : Fuzz(ctx, url, wordlist, opts)
+Adapter -> Tool : exec.CommandContext(ffuf, args...)
+Tool --> Adapter : Result{stdout, stderr, exitcode}
+Adapter --> Tech : *Result
+Tech --> Engine : ExecutionResult
+Engine --> CLI : []ExecutionResult
+CLI --> User : succeeded BB05.001: 目录枚举完成
+@enduml

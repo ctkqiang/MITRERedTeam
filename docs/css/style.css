@@ -1,0 +1,72 @@
+/* MITRERedTeam 开发文档补充样式
+ * 主体布局与组件样式由 Ant Design 5 提供，本文件仅覆盖 antd 未覆盖的细节：
+ * 代码块、图表容器发光、侧栏锚点与滚动条等。 */
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  background: #0b0f1a;
+}
+
+/* 代码块 */
+.doc-code {
+  margin: 1rem 0;
+  padding: 1rem 1.25rem;
+  background: #0d1424;
+  border: 1px solid #253049;
+  border-radius: 10px;
+  overflow-x: auto;
+  font-family: "SFMono-Regular", "JetBrains Mono", "Fira Code", Consolas,
+    monospace;
+  font-size: 0.85rem;
+  line-height: 1.7;
+  color: #dbe4f5;
+}
+
+.doc-code code {
+  font-family: inherit;
+  background: none;
+  padding: 0;
+}
+
+/* 图表容器：悬停发光 */
+.figure-card {
+  text-align: center;
+  transition: box-shadow 0.25s ease, border-color 0.25s ease;
+}
+
+.figure-card:hover {
+  border-color: #22d3ee;
+  box-shadow: 0 0 26px rgba(34, 211, 238, 0.28);
+}
+
+.figure-card img {
+  max-width: 100%;
+  height: auto;
+  border-radius: 8px;
+}
+
+/* 侧栏锚点链接 */
+.ant-anchor-link-title {
+  font-size: 0.88rem;
+}
+
+/* 自定义滚动条 */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #2a3550;
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #3b4a6e;
+}

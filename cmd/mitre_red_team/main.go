@@ -98,7 +98,7 @@ func main() {
 	executionEngine := engine.New(catalogData)
 
 	var results []model.ExecutionResult
-	var mode string
+	mode := "按技术执行"
 	switch {
 	case *aiMode:
 		mode = "AI 辅助执行"

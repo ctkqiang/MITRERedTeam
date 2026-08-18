@@ -66,7 +66,7 @@ func TestOpenAICompatComplete(t *testing.T) {
 			t.Errorf("解析请求体失败: %v", err)
 		}
 		writer.WriteHeader(http.StatusOK)
-		_, _ = writer.Write([]byte(`{"choices":[{"message":{"content":"mock 回复"}}]}`))
+		writer.Write([]byte(`{"choices":[{"message":{"content":"mock 回复"}}]}`))
 	}))
 	defer server.Close()
 
@@ -108,7 +108,7 @@ func TestOpenAICompatComplete(t *testing.T) {
 func TestOpenAICompatHTTPError(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
 		writer.WriteHeader(http.StatusUnauthorized)
-		_, _ = writer.Write([]byte(`{"error":{"message":"invalid api key"}}`))
+		writer.Write([]byte(`{"error":{"message":"invalid api key"}}`))
 	}))
 	defer server.Close()
 
@@ -161,7 +161,7 @@ func TestFromEnvMissingCredential(t *testing.T) {
 // 验证空 choices 返回 ErrEmptyResponse。
 func TestOpenAICompatEmptyChoices(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
-		_, _ = writer.Write([]byte(`{"choices":[]}`))
+		writer.Write([]byte(`{"choices":[]}`))
 	}))
 	defer server.Close()
 
@@ -185,7 +185,7 @@ func TestAnthropicComplete(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
 		receivedAuth = request.Header.Get("x-api-key")
 		receivedVersion = request.Header.Get("anthropic-version")
-		_, _ = writer.Write([]byte(`{"content":[{"type":"text","text":"claude 回复"}]}`))
+		writer.Write([]byte(`{"content":[{"type":"text","text":"claude 回复"}]}`))
 	}))
 	defer server.Close()
 

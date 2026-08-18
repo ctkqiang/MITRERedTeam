@@ -1,20 +1,6 @@
-# =============================================================================
-# MITRERedTeam 跨平台持续集成工作流
-#
-# 覆盖能力：
-#   1. Lint    - gofmt 格式检查 / go vet 静态分析 / golangci-lint 代码检查
-#   2. Test    - go test -race ./... 全量测试 + 竞态检测
-#   3. Compile - macOS / Ubuntu / Windows 三平台编译、测试与产物归档
-#   4. Summary - 汇总各 Job 结果，任一失败即标记整体失败
-#
-# 设计说明：
-#   - 编译 Job 使用矩阵（matrix）消除三份重复步骤，新增平台只需扩展 include
-#   - 统一禁用 core.autocrlf，配合仓库 .gitattributes 保证 LF 检出，
-#     避免 Windows 上 gofmt 误报"全部未格式化"
-#   - fail-fast: false 让单个平台失败不中断其余平台验证
-#   - setup-go 显式 cache: false：GitCode 与 GitHub 需保持一致且均可运行，
-#     不依赖各自平台的缓存服务差异
-# =============================================================================
+# 三平台（macOS / Ubuntu / Windows）持续集成：lint → test → 编译打包 → 汇总。
+# 编译用矩阵消除重复；统一 core.autocrlf=false 配合 .gitattributes 保证 LF 检出，
+# 否则 Windows 上 gofmt 会误报"全部未格式化"。
 name: 跨平台持续集成
 
 on:
@@ -24,19 +10,17 @@ on:
     branches: [main, master]
   workflow_dispatch:
 
-# 最小权限：CI 只需读取仓库内容，不授予任何写权限
+# 只读仓库内容即可，不需要写权限
 permissions:
   contents: read
 
-# 同一分支并发触发时取消旧运行，节省资源
+# 同一分支的新触发会取消旧运行
 concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
-  # ===========================================================================
-  # Lint：格式与静态检查（单平台即可，与目标平台无关）
-  # ===========================================================================
+  # Lint：格式与静态检查，单平台跑一遍就够
   lint:
     name: Lint（gofmt + vet + golangci-lint）
     runs-on: ubuntu-latest
@@ -68,9 +52,7 @@ jobs:
           go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest
           golangci-lint run ./...
 
-  # ===========================================================================
-  # Test：全量测试 + 竞态检测
-  # ===========================================================================
+  # 全量测试 + 竞态检测
   test:
     name: Test（go test -race）
     runs-on: ubuntu-latest
@@ -88,9 +70,7 @@ jobs:
       - name: 运行全量测试（含竞态检测）
         run: go test -race ./...
 
-  # ===========================================================================
-  # Compile：三平台编译矩阵
-  # ===========================================================================
+  # 三平台编译矩阵
   compile:
     name: 编译 - ${{ matrix.platform }}
     needs: [lint]
@@ -154,9 +134,7 @@ jobs:
           path: build/${{ matrix.binary }}
           retention-days: 30
 
-  # ===========================================================================
-  # Summary：汇总所有 Job 结果
-  # ===========================================================================
+  # 汇总所有 Job 结果，任一失败即整体失败
   summary:
     name: 构建汇总
     runs-on: ubuntu-latest

@@ -1,0 +1,129 @@
+# 推 v* tag 时构建三平台二进制并发布 GitHub Release。
+# 产物列表：darwin-amd64 / darwin-arm64 / linux-amd64 / linux-arm64 / windows-amd64
+# 每个产物带 .sha256 校验文件。用法：git tag v1.0.0 && git push origin v1.0.0
+name: 发布 Release
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+
+# 发布要写 Release 和 tag
+permissions:
+  contents: write
+
+jobs:
+  build:
+    name: 构建 - ${{ matrix.name }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: darwin-amd64
+            goos: darwin
+            goarch: amd64
+            ext: ""
+          - name: darwin-arm64
+            goos: darwin
+            goarch: arm64
+            ext: ""
+          - name: linux-amd64
+            goos: linux
+            goarch: amd64
+            ext: ""
+          - name: linux-arm64
+            goos: linux
+            goarch: arm64
+            ext: ""
+          - name: windows-amd64
+            goos: windows
+            goarch: amd64
+            ext: ".exe"
+    steps:
+      - name: 检出代码
+        uses: actions/checkout@v4
+
+      - name: 安装 Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: "1.26"
+          cache: false
+
+      - name: 编译二进制
+        env:
+          GOOS: ${{ matrix.goos }}
+          GOARCH: ${{ matrix.goarch }}
+          CGO_ENABLED: "0"
+        run: |
+          binary="mitre_red_team-${{ matrix.name }}${{ matrix.ext }}"
+          go build -trimpath -ldflags "-s -w -X main.version=${{ github.ref_name }}" \
+            -o "dist/$binary" ./cmd/mitre_red_team
+          sha256sum "dist/$binary" > "dist/$binary.sha256"
+
+      - name: 上传构建产物
+        uses: actions/upload-artifact@v4
+        with:
+          name: dist-${{ matrix.name }}
+          path: dist/
+          retention-days: 1
+
+  release:
+    name: 发布 - ${{ github.ref_name }}
+    needs: [build]
+    runs-on: ubuntu-latest
+    steps:
+      - name: 检出代码
+        uses: actions/checkout@v4
+
+      - name: 下载全部构建产物
+        uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+
+      - name: 校验产物完整性
+        run: |
+          cd dist
+          for file in *.sha256; do
+            sha256sum -c "$file" || { echo "::error::校验失败 $file"; exit 1; }
+          done
+          echo "全部产物校验通过："
+          ls -la
+
+      - name: 创建 GitHub Release 并上传产物
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          name: ${{ github.ref_name }}
+          body: |
+            ## MITRERedTeam ${{ github.ref_name }}
+
+            MITRERedTeam 是授权范围内的红队 / 漏洞赏金 CLI 安全工具，
+            基于 MITRE ATT&CK 战术与技术模型，数据驱动、显式执行。
+
+            ### 本次发布内容
+
+            - 跨平台编译产物：macOS（Intel / Apple Silicon）、Linux（x86_64 / ARM64）、Windows x86_64
+            - 每个产物附带 SHA256 校验文件，请核对后再使用
+
+            ### 使用方式
+
+            ```bash
+            # macOS / Linux
+            chmod +x mitre_red_team-*
+            ./mitre_red_team --url https://example.com --technique BB05.001
+
+            # Windows（PowerShell）
+            .\mitre_red_team-windows-amd64.exe --url https://example.com --technique BB05.001
+            ```
+
+            ### 校验产物
+
+            ```bash
+            sha256sum -c mitre_red_team-<平台>.sha256
+            ```
+          files: |
+            dist/*
+          fail_on_unmatched_files: true

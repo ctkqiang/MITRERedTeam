@@ -102,10 +102,7 @@ func TestValidateWordlistUnreadable(t *testing.T) {
 	if err := os.Chmod(path, 0000); err != nil {
 		t.Fatalf("修改权限失败: %v", err)
 	}
-	defer func() {
-		// 测试结束时恢复权限，保证临时目录可被清理。
-		_ = os.Chmod(path, 0600)
-	}()
+	defer os.Chmod(path, 0600)
 
 	probe, err := os.Open(path)
 	if err == nil {

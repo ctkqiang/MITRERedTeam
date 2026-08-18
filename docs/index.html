@@ -338,14 +338,14 @@ go run ./cmd/mitre_red_team --url https://example.com --technique BB05.001 --ai`
 
               <SectionTitle id="overview" title="项目概述" />
               <Paragraph>
-                MITRERedTeam 是一个用 Go 编写的授权红队 / 漏洞赏金 CLI 安全工具。它以 MITRE ATT&amp;CK
-                战术与技术模型为骨架，把完整评估流程拆分为<Text strong>战术（Tactic）</Text>与
-                <Text strong>技术（Technique）</Text>两级，用户显式选择单条技术或整个战术执行，应用绝不自动编排所有内容，
-                也不扩大用户声明的目标范围。
+                MITRERedTeam 是一个用 Go 写的授权红队 / 漏洞赏金命令行工具。评估流程按
+                <Text strong>战术（Tactic）</Text>和<Text strong>技术（Technique）</Text>两级组织，编号是自研的
+                <Text code>BBxx</Text> / <Text code>BBxx.xxx</Text>。执行什么、怎么执行都由你说了算——只跑你显式指定的那条
+                技术或那个战术，不会自作主张把清单里的东西全跑一遍，也不会超出你声明的目标范围。
               </Paragraph>
               <Paragraph>
-                战术与技术清单由 <Text code>catalog/*.json</Text> 外部数据驱动，技术主键采用自研稳定编号
-                （<Text code>BBxx</Text> 战术、<Text code>BBxx.xxx</Text> 技术），MITRE ATT&amp;CK ID 仅作为行业标准对齐的元数据。
+                战术和技术的清单放在 <Text code>catalog/*.json</Text>，纯数据驱动。MITRE ATT&amp;CK ID 只用来对齐行业标准，
+                不算主标识符。
               </Paragraph>
               <Table columns={featureColumns} dataSource={featureData} pagination={false} size="middle" />
 

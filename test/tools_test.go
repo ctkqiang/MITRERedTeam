@@ -16,7 +16,7 @@ import (
 
 // 验证成功执行时 stdout 内容与退出码。
 func TestRunnerSuccessfulExecution(t *testing.T) {
-	runner := tools.NewRunner("/bin/echo", 5*time.Second)
+	runner := tools.NewRunner(fakeToolPath(t, behaviorEcho), 5*time.Second)
 	result, err := runner.Run(context.Background(), []string{"hello"})
 	if err != nil {
 		t.Fatalf("执行失败: %v", err)
@@ -31,7 +31,7 @@ func TestRunnerSuccessfulExecution(t *testing.T) {
 
 // 验证参数以切片原样传递，不做 shell 解释。
 func TestRunnerPreservesArguments(t *testing.T) {
-	runner := tools.NewRunner("/bin/echo", 5*time.Second)
+	runner := tools.NewRunner(fakeToolPath(t, behaviorEcho), 5*time.Second)
 	result, err := runner.Run(context.Background(), []string{"-p", "80", "example.com"})
 	if err != nil {
 		t.Fatalf("执行失败: %v", err)
@@ -43,7 +43,7 @@ func TestRunnerPreservesArguments(t *testing.T) {
 
 // 验证非零退出码与 stderr 捕获。
 func TestRunnerNonZeroExit(t *testing.T) {
-	runner := tools.NewRunner("/bin/ls", 5*time.Second)
+	runner := tools.NewRunner(fakeToolPath(t, behaviorFail), 5*time.Second)
 	result, err := runner.Run(context.Background(), []string{"/nonexistent-path-xyz"})
 	if err != nil {
 		t.Fatalf("非零退出不应视为系统错误: %v", err)
@@ -58,7 +58,7 @@ func TestRunnerNonZeroExit(t *testing.T) {
 
 // 验证超时返回错误。
 func TestRunnerTimeout(t *testing.T) {
-	runner := tools.NewRunner("/usr/bin/sleep", 100*time.Millisecond)
+	runner := tools.NewRunner(fakeToolPath(t, behaviorSleep), 100*time.Millisecond)
 	if _, err := runner.Run(context.Background(), []string{"5"}); err == nil {
 		t.Fatal("期望超时返回错误，实际无错误")
 	}
@@ -66,7 +66,7 @@ func TestRunnerTimeout(t *testing.T) {
 
 // 验证 nmap 适配器的参数构造。
 func TestNmapAdapterArguments(t *testing.T) {
-	scanner := nmap.New("/bin/echo", 5*time.Second)
+	scanner := nmap.New(fakeToolPath(t, behaviorEcho), 5*time.Second)
 	result, err := scanner.Scan(context.Background(), "example.com", "80,443")
 	if err != nil {
 		t.Fatalf("扫描失败: %v", err)
@@ -78,7 +78,7 @@ func TestNmapAdapterArguments(t *testing.T) {
 
 // 验证 httpx 适配器的参数构造。
 func TestHttpxAdapterArguments(t *testing.T) {
-	prober := httpx.New("/bin/echo", 5*time.Second)
+	prober := httpx.New(fakeToolPath(t, behaviorEcho), 5*time.Second)
 	result, err := prober.Probe(context.Background(), "https://example.com")
 	if err != nil {
 		t.Fatalf("探测失败: %v", err)
@@ -90,7 +90,7 @@ func TestHttpxAdapterArguments(t *testing.T) {
 
 // 验证 subfinder 适配器的参数构造。
 func TestSubfinderAdapterArguments(t *testing.T) {
-	enumerator := subfinder.New("/bin/echo", 5*time.Second)
+	enumerator := subfinder.New(fakeToolPath(t, behaviorEcho), 5*time.Second)
 	result, err := enumerator.Enumerate(context.Background(), "example.com")
 	if err != nil {
 		t.Fatalf("枚举失败: %v", err)
@@ -102,7 +102,7 @@ func TestSubfinderAdapterArguments(t *testing.T) {
 
 // 验证 sqlmap 适配器的参数构造。
 func TestSqlmapAdapterArguments(t *testing.T) {
-	injector := sqlmap.New("/bin/echo", 5*time.Second)
+	injector := sqlmap.New(fakeToolPath(t, behaviorEcho), 5*time.Second)
 	result, err := injector.Inject(context.Background(), "https://example.com?id=1")
 	if err != nil {
 		t.Fatalf("注入检测失败: %v", err)
@@ -114,7 +114,7 @@ func TestSqlmapAdapterArguments(t *testing.T) {
 
 // 验证 ffuf 适配器按默认选项构造完整参数。
 func TestFfufAdapterArguments(t *testing.T) {
-	fuzzer := ffuf.New("/bin/echo", 5*time.Second)
+	fuzzer := ffuf.New(fakeToolPath(t, behaviorEcho), 5*time.Second)
 	result, err := fuzzer.Fuzz(context.Background(), "https://example.com/FUZZ", "/tmp/words.txt", ffuf.DefaultFuzzOptions())
 	if err != nil {
 		t.Fatalf("枚举失败: %v", err)
@@ -138,7 +138,7 @@ func TestFfufAdapterArguments(t *testing.T) {
 
 // 验证零值 FuzzOptions 不产生多余参数，仅保留必填的 -u 与 -w。
 func TestFfufAdapterZeroOptions(t *testing.T) {
-	fuzzer := ffuf.New("/bin/echo", 5*time.Second)
+	fuzzer := ffuf.New(fakeToolPath(t, behaviorEcho), 5*time.Second)
 	result, err := fuzzer.Fuzz(context.Background(), "https://example.com/FUZZ", "/tmp/words.txt", ffuf.FuzzOptions{})
 	if err != nil {
 		t.Fatalf("枚举失败: %v", err)

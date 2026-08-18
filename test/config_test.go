@@ -79,10 +79,14 @@ func TestLocalNotificationExplicitlyDisabled(t *testing.T) {
 
 // 验证全部工具路径可用时无缺失。
 func TestCheckToolsAvailableAllPresent(t *testing.T) {
+	executable, err := os.Executable()
+	if err != nil {
+		t.Fatalf("获取测试二进制路径失败: %v", err)
+	}
 	configuration := &config.Config{
 		Tools: map[string]string{
-			"echo": "/bin/echo",
-			"ls":   "/bin/ls",
+			"echo": executable,
+			"ls":   executable,
 		},
 	}
 	if missing := configuration.CheckToolsAvailable(); len(missing) != 0 {
@@ -92,10 +96,15 @@ func TestCheckToolsAvailableAllPresent(t *testing.T) {
 
 // 验证存在无效路径时报告对应工具名。
 func TestCheckToolsAvailableMissing(t *testing.T) {
+	executable, err := os.Executable()
+	if err != nil {
+		t.Fatalf("获取测试二进制路径失败: %v", err)
+	}
+	ghostPath := filepath.Join(t.TempDir(), "ghost")
 	configuration := &config.Config{
 		Tools: map[string]string{
-			"echo":  "/bin/echo",
-			"ghost": "/nonexistent/tool",
+			"echo":  executable,
+			"ghost": ghostPath,
 			"empty": "",
 		},
 	}

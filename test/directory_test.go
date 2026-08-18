@@ -13,7 +13,7 @@ import (
 
 // 验证字典缺失时返回失败，而不是伪装成成功。
 func TestDirectoryEnumerationMissingWordlist(t *testing.T) {
-	executor := enumeration.NewDirectoryEnumeration("/bin/echo", filepath.Join(t.TempDir(), "missing.txt"))
+	executor := enumeration.NewDirectoryEnumeration(fakeToolPath(t, behaviorEcho), filepath.Join(t.TempDir(), "missing.txt"))
 	result, err := executor.Execute(context.Background(), model.Target{Host: "example.com", Scheme: "https"})
 	if err == nil {
 		t.Fatal("期望字典缺失返回错误，实际无错误")
@@ -29,7 +29,7 @@ func TestDirectoryEnumerationToolFailure(t *testing.T) {
 	if err := os.WriteFile(wordlist, []byte("admin\n"), 0600); err != nil {
 		t.Fatalf("写入字典失败: %v", err)
 	}
-	executor := enumeration.NewDirectoryEnumeration("/bin/false", wordlist)
+	executor := enumeration.NewDirectoryEnumeration(fakeToolPath(t, behaviorFail), wordlist)
 	_, err := executor.Execute(context.Background(), model.Target{Host: "example.com", Scheme: "https"})
 	if err == nil {
 		t.Fatal("期望工具非零退出返回错误，实际无错误")
@@ -42,7 +42,7 @@ func TestDirectoryEnumerationNoHits(t *testing.T) {
 	if err := os.WriteFile(wordlist, []byte("admin\n"), 0600); err != nil {
 		t.Fatalf("写入字典失败: %v", err)
 	}
-	executor := enumeration.NewDirectoryEnumeration("/usr/bin/true", wordlist)
+	executor := enumeration.NewDirectoryEnumeration(fakeToolPath(t, behaviorTrue), wordlist)
 	result, err := executor.Execute(context.Background(), model.Target{Host: "example.com", Scheme: "https"})
 	if err != nil {
 		t.Fatalf("执行失败: %v", err)

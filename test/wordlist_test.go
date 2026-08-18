@@ -96,17 +96,23 @@ func TestValidateWordlistOverlongLine(t *testing.T) {
 }
 
 // 验证无读取权限的文件被拒绝（受限环境下跳过）。
+// Windows 权限语义与 Unix 不同，chmod 0000 后文件仍可能可读，此时跳过断言即可。
 func TestValidateWordlistUnreadable(t *testing.T) {
 	path := writeTestWordlist(t, "admin\n")
 	if err := os.Chmod(path, 0000); err != nil {
 		t.Fatalf("修改权限失败: %v", err)
 	}
 	defer os.Chmod(path, 0600)
-	if _, err := os.Open(path); err != nil {
-		// 当前用户确实无权读取时，才断言校验报错。
-		if validationErr := enumeration.ValidateWordlist(path); validationErr == nil {
-			t.Fatal("期望无权限字典报错，实际无错误")
-		}
+
+	probe, err := os.Open(path)
+	if err == nil {
+		// 当前用户仍可读取（如 Windows 只读位不影响读取），关闭句柄后跳过断言。
+		probe.Close()
+		return
+	}
+	// 当前用户确实无权读取时，才断言校验报错。
+	if validationErr := enumeration.ValidateWordlist(path); validationErr == nil {
+		t.Fatal("期望无权限字典报错，实际无错误")
 	}
 }
 

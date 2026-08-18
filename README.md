@@ -27,9 +27,9 @@
 
 ## 项目概述
 
-MITRERedTeam 是一个用 **Go** 编写的授权红队 / 漏洞赏金 CLI 安全工具。它把完整的评估流程拆分为**战术（Tactic）**与**技术（Technique）**两级，采用自研稳定编号（`BBxx` 战术、`BBxx.xxx` 技术）作为主键，用户显式选择单条技术或整个战术执行，应用绝不自动编排所有内容，也不扩大用户声明的目标范围。
+MITRERedTeam 是一个用 **Go** 写的授权红队 / 漏洞赏金命令行工具。整个评估流程按**战术（Tactic）**和**技术（Technique）**两级组织，编号是自研的 `BBxx` / `BBxx.xxx`。执行什么、怎么执行都由你说了算——只跑你显式指定的那条技术或那个战术，不会自作主张把清单里的东西全跑一遍，也不会超出你声明的目标范围。
 
-战术与技术清单由 `catalog/*.json` 外部数据驱动，MITRE ATT&CK ID 仅作为对齐行业标准的元数据，不作为主标识符。当前目录覆盖 **25 个战术、27 条技术**，并已落地目录枚举执行器与六类外部工具适配层。
+战术和技术的清单放在 `catalog/*.json`，纯数据驱动。MITRE ATT&CK ID 只用来对齐行业标准，不算主标识符。目前目录里有 **25 个战术、27 条技术**，目录枚举的执行器和六类外部工具的适配层都已落地。
 
 **核心特性：**
 
@@ -91,7 +91,7 @@ MITRERedTeam 是一个用 **Go** 编写的授权红队 / 漏洞赏金 CLI 安全
 
 ## 系统架构
 
-MITRERedTeam 采用**目录驱动的注册式插件架构**（Catalog-Driven Registry Plugin Architecture，CDRPA），组合五种模式：目录驱动、注册模式、插件架构、分层架构、依赖倒置。核心系统只依赖抽象，不依赖具体安全工具与技术实现；新增技术、工具集成时尽量不改动核心执行引擎。
+这套架构叫 **CDRPA**（目录驱动的注册式插件架构），拼了五种套路：目录驱动、注册模式、插件架构、分层架构、依赖倒置。核心系统不碰具体工具和具体技术实现，只认抽象。加新技术、接新工具的时候，尽量不动核心执行引擎。
 
 ![系统架构与数据流](docs/assets/flow.png)
 
@@ -107,17 +107,17 @@ MITRERedTeam 采用**目录驱动的注册式插件架构**（Catalog-Driven Reg
 | Tool 适配层（`tools/`） | 封装外部工具：路径解析、参数构造、超时、输出处理 |
 | Result / Evidence / Finding | 执行结果、证据与最终发现的递进产出 |
 
-完整链路：用户通过 CLI 提交请求 → Planner 生成执行计划 → Engine 校验目标并调度 → Technique Registry 按 `executor` 解析出领域技术实现 → 技术实现经 Tool 适配层调用外部工具（ffuf、nmap、nuclei 等）→ 产出结构化 Result。
+走一遍完整数据流就是：CLI 收请求 → Planner 出执行计划 → Engine 校验目标并调度 → Technique Registry 按 `executor` 找到对应实现 → 技术实现经 Tool 适配层调用 ffuf、nmap、nuclei 这些外部工具 → 最后产出结构化 Result。
 
 ## 执行流程
 
-一次技术执行的完整时序如下：
+一次技术执行的时序见下图：
 
 ![技术执行时序](docs/assets/sequence.png)
 
 📁 图表源码：[sequence.puml](docs/assets/sequence.puml) | 🖼️ PNG：[sequence.png](docs/assets/sequence.png)
 
-### 启动阶段
+启动阶段会依次做这几件事：
 
 1. **加载环境变量**：读取 `.env`（不存在或条目为空时静默忽略）。
 2. **加载配置**：解析 `configs/redteam.json`，含工具路径、字典、通知偏好。
@@ -127,7 +127,7 @@ MITRERedTeam 采用**目录驱动的注册式插件架构**（Catalog-Driven Reg
 6. **检查依赖工具**：遍历配置声明，缺失时输出缺失清单与安装指引并退出。
 7. **解析字典**：优先 `--wordlist/-w`，否则交互询问（非交互环境直接回退默认字典）。
 
-### 执行阶段
+这些做完之后进入执行阶段：
 
 8. **注册技术实现**：把已实现的 executor 注册进 Technique Registry。
 9. **解析目标**：从 URL 提取主机、协议、端口。
@@ -199,7 +199,7 @@ MITRERedTeam 采用**目录驱动的注册式插件架构**（Catalog-Driven Reg
 | BB18.002 | 公共存储桶检测 | BB18 | active | - | T1530 | 否 |
 | BB22.001 | 已知 CVE 检测 | BB22 | active | nuclei | T1203 | 否 |
 
-执行规划中的技术时，引擎会跳过未注册的执行器并明确提示，不静默成功。
+执行到还没实现的技术时，引擎会跳过并把话说清楚，不会假装成功。
 
 ### 执行模式
 
@@ -211,7 +211,7 @@ MITRERedTeam 采用**目录驱动的注册式插件架构**（Catalog-Driven Reg
 
 ## 工具集成
 
-所有外部工具经 `tools/` 适配层调用，统一处理路径解析、参数构造、context 超时、stdout/stderr 与退出码。技术实现不得直接执行 `exec.Command`。
+外部工具统一走 `tools/` 适配层：路径解析、参数构造、context 超时、stdout/stderr 和退出码都在这一层处理。技术实现里不允许直接 `exec.Command`。
 
 | 工具 | 适配器 | 方法 | 典型参数 | 对应技术 |
 |---|---|---|---|---|
@@ -317,7 +317,7 @@ succeeded BB05.001: 目录枚举完成，未发现命中（匹配状态码 200/3
 
 ### 环境变量（`.env`）
 
-`.env` 存放通知凭据与 AI 供应商 API Key，已被 `.gitignore` 忽略，不进版本仓库。复制 `.env.example` 为 `.env` 并填写实际值。
+`.env` 里放通知凭据和 AI 供应商的 API Key，`.gitignore` 已经把它排除在外，不会进版本仓库。复制 `.env.example` 为 `.env`，填上实际值就行。
 
 | 变量 | 用途 |
 |---|---|
@@ -345,7 +345,7 @@ succeeded BB05.001: 目录枚举完成，未发现命中（匹配状态码 200/3
 
 ## AI 辅助执行
 
-通过 `--ai` 启用 AI 辅助模式：程序执行用户请求的初始技术，把执行输出交给 LLM 分析，并由 LLM 从目录中选择并自动推进建议的下一步技术（最多 **3 轮**）。至少配置一家供应商的 API Key 后才能启用；未配置任何供应商时 `--ai` 会明确报错，不会静默失败。
+`--ai` 打开 AI 辅助模式：先执行你指定的初始技术，把输出交给 LLM 分析，LLM 再从目录里挑一条建议的技术继续推进，最多跑 **3 轮**。前提是 `.env` 里至少配了一家供应商的 API Key——一家都没有的话，`--ai` 会直接报错告诉你缺什么，不会闷声不响。
 
 | 供应商 | 凭据变量 | 模型变量 | 默认模型 |
 |---|---|---|---|
@@ -364,7 +364,7 @@ succeeded BB05.001: 目录枚举完成，未发现命中（匹配状态码 200/3
 
 ## 通知系统
 
-执行结果可通过三条通道送达：
+执行结果有三条通道可以送出去：
 
 | 通道 | 配置 | 说明 |
 |---|---|---|
@@ -374,7 +374,7 @@ succeeded BB05.001: 目录枚举完成，未发现命中（匹配状态码 200/3
 
 ## 日志系统
 
-应用全程使用结构化日志器，每行日志包含 RFC3339 时间戳、级别、操作名（`op=`）、内存统计（`mem[]=`）与描述（`desc=`），输出到 stderr：
+日志统一走结构化格式，一行里带上 RFC3339 时间戳、级别、操作名（`op=`）、内存统计（`mem[]=`）和描述（`desc=`），打到 stderr：
 
 ```
 2026-08-17T03:57:25Z [信息] op=LoadDotenv desc=环境文件加载完成
@@ -443,7 +443,7 @@ succeeded BB05.001: 目录枚举完成，未发现命中（匹配状态码 200/3
 
 ### 校验规则
 
-启动时 `catalog.Validate` 强制执行：
+启动时 `catalog.Validate` 会检查下面几项：
 
 1. 战术 ID 唯一。
 2. 技术 ID 唯一。
@@ -457,16 +457,16 @@ succeeded BB05.001: 目录枚举完成，未发现命中（匹配状态码 200/3
 
 1. 在 `catalog/techniques.json` 添加条目，声明 `executor`、`mode`、`tools` 与 `mitre` 映射。
 2. 在 `internal/technique/` 对应领域子目录实现执行器，经 `technique.Register(executor, impl)` 注册。
-3. 技术实现不得直接执行 `exec.Command`，统一经 `tools/` 适配层调用外部工具。
-4. 补充参数构造测试（`test/tools_test.go` 用 `/bin/echo` 作假命令）与行为测试。
+3. 技术实现里不碰 `exec.Command`，统一经 `tools/` 适配层调外部工具。
+4. 补上参数构造测试（`test/tools_test.go` 用 `fakeToolPath` 作假命令）和行为测试。
 
 ### 新增一个工具适配器
 
-按 `tools/README.md` 五步指南：新建 `tools/<name>/`、嵌入 `tools.Adapter` 公共基座、实现业务方法、在 `configs/redteam.json` 声明配置、补测试并更新适配器清单。
+照着 `tools/README.md` 的五步指南来：新建 `tools/<name>/`、嵌入 `tools.Adapter` 公共基座、实现业务方法、在 `configs/redteam.json` 声明配置、补测试并更新适配器清单。
 
 ### 新增/调整 MITRE 映射
 
-只需修改 `catalog/techniques.json` 的 `mitre` 字段，随后运行校验确认数据一致：
+改 `catalog/techniques.json` 里的 `mitre` 字段就行，然后跑一下校验确认数据没写错：
 
 ```bash
 go test ./test/ -run TestTechniquesByMitreID -v

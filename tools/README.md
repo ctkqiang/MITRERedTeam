@@ -1,6 +1,6 @@
 # tools/ 工具适配层
 
-`tools/` 是外部安全工具的统一适配层。技术实现（`internal/technique/`）不得直接执行 `exec.Command`，一律经此层调用外部工具。本层遵循 `dir_structure.md`、`code_structure.md`、`security_structure.md` 的约束：`exec.CommandContext` + 超时、参数切片传递、工具路径可配置、stderr 不吞。
+`tools/` 是外部安全工具的统一适配层。技术实现（`internal/technique/`）不允许直接 `exec.Command`，一律经这层调外部工具。本层守 `dir_structure.md`、`code_structure.md`、`security_structure.md` 的规矩：`exec.CommandContext` + 超时、参数切片传递、工具路径可配置、stderr 不吞。
 
 ## 目录结构
 
@@ -106,11 +106,11 @@ if !result.Succeeded() {
 
 3. 实现业务方法：校验入参后调用 `s.Adapter.Run(ctx, arguments)` 组装参数切片，禁止拼接 shell 字符串。参数复杂时仿照 `ffuf.FuzzOptions` 提供选项结构。
 4. 在 `configs/redteam.json` 的 `tools` 段声明工具路径。
-5. 在 `test/tools_test.go` 新增参数构造测试，用 `/bin/echo` 作假命令断言命令行内容；同时更新本 README 的适配器清单表。
+5. 在 `test/tools_test.go` 新增参数构造测试，用 `fakeToolPath` 作假命令断言命令行内容；同时更新本 README 的适配器清单表。
 
 ## 集成点
 
 - **配置**：`configs/redteam.json` 的 `tools` 段声明各工具可执行路径。
 - **技术层**：`internal/technique/` 的领域实现按 catalog 的 `tools` 字段选用对应适配器（executor 注册模式）。目录枚举（BB05.001）经 `tools/ffuf` 适配器执行，参数构造不散落在技术层。
 - **执行器**：所有适配器复用 `tools.Runner`，统一处理超时、stdout/stderr 与退出码。
-- **测试**：`test/tools_test.go` 用 `/bin/echo` 作假命令验证各适配器的参数构造，不依赖真实工具二进制。
+- **测试**：`test/tools_test.go` 用测试二进制自身（`fakeToolPath`）作假命令验证各适配器的参数构造，跨平台可用，不依赖真实工具。

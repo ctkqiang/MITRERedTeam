@@ -1,6 +1,6 @@
 # MITRE ATT&CK 工具映射与执行工作流
 
-本文档说明 MITRERedTeam 如何基于 MITRE ATT&CK 战术与技术映射并执行安全工具。映射数据来自 `catalog/techniques.json` 的 `mitre` 字段，由 catalog 层解析，engine 层执行。
+这篇文章讲 MITRERedTeam 怎么把 MITRE ATT&CK 的战术和技术映射起来、再拿去跑工具。映射数据存在 `catalog/techniques.json` 的 `mitre` 字段里，catalog 层负责解析，engine 层负责执行。
 
 ## 1. 映射机制
 
@@ -23,7 +23,7 @@
 | `tools` | 执行该技术所需的外部安全工具 |
 | `executor` | 映射到 `internal/technique/` 注册表中的 Go 实现 |
 
-一个 MITRE ID 可映射多条技术；一条技术也可声明多个 MITRE ID。MITRE ID 在本项目**仅作为元数据与查询入口**，主标识仍是 `BBxx.xxx`（见 `dir_structure.md`）。
+一个 MITRE ID 可以对应多条技术，一条技术也能声明多个 MITRE ID。MITRE ID 在这里**只是元数据和查询入口**，真正的主标识还是 `BBxx.xxx`（见 `dir_structure.md`）。
 
 ## 2. 组件职责
 
@@ -69,15 +69,15 @@ go run ./cmd/mitre_red_team --url https://example.com --tactic BB05
 
 - `--url` 目标必填。
 - `--technique` / `--tactic` / `--mitre` 三者选一。
-- 目标工具需已安装，路径在 `configs/redteam.json` 声明；未安装时命令返回明确错误，不静默继续。
-- 本工具为授权范围内的**手动触发**工具，不会自动展开或静默扩大目标。
+- 目标工具得先装好，路径在 `configs/redteam.json` 里声明；没装的话命令会明确报错，不会闷头继续。
+- 这是授权范围内的**手动触发**工具，不会自动展开，也不会悄悄扩大目标。
 
 ## 5. 维护映射
 
-新增或调整 MITRE 映射只需修改 `catalog/techniques.json` 的 `mitre` 字段，随后运行校验确认数据一致：
+新增或调整 MITRE 映射，改 `catalog/techniques.json` 里的 `mitre` 字段就行，然后跑一下校验确认数据没写错：
 
 ```bash
 go test ./test/ -run TestTechniquesByMitreID -v
 ```
 
-MITRE ATT&CK 版本更新时（如新增/合并技术 ID），同步调整 `mitre` 字段即可，无需改动代码——数据驱动保证了这一点。
+MITRE ATT&CK 版本更新时（比如新增、合并了技术 ID），跟着改 `mitre` 字段即可，代码一个字都不用动——数据驱动的好处就在这。
